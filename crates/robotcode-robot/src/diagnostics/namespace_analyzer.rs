@@ -24,8 +24,8 @@ use robotcode_rf_parser::variables::{contains_variable, search_variable};
 
 use super::entities::{normalize_keyword_name, VariableDefinition, VariableScope};
 use super::errors::{
-    make_diagnostic, DEPRECATED_KEYWORD, KEYWORD_NOT_FOUND, MULTIPLE_KEYWORDS, PRIVATE_KEYWORD,
-    VARIABLE_NOT_FOUND,
+    make_diagnostic, DEPRECATED_KEYWORD, KEYWORD_ALREADY_DEFINED, KEYWORD_NOT_FOUND,
+    MULTIPLE_KEYWORDS, PRIVATE_KEYWORD, VARIABLE_NOT_FOUND,
 };
 use super::keyword_finder::KeywordMatch;
 use super::namespace::Namespace;
@@ -53,15 +53,33 @@ pub struct AnalysisResult {
 pub struct NamespaceAnalyzer<'a> {
     namespace: &'a Namespace,
     source_path: Option<std::path::PathBuf>,
+    /// When `false`, keyword-existence checks (`KeywordNotFound`,
+    /// `MultipleKeywords`) are suppressed.  Set to `false` when the namespace
+    /// has no resolved imports (libraries or resources) so that incompletely
+    /// resolved namespaces do not produce a flood of false-positive diagnostics.
+    check_keywords: bool,
 }
 
 impl<'a> NamespaceAnalyzer<'a> {
     /// Create a new analyzer for `namespace`.
+    ///
+    /// Keyword-existence checks are automatically enabled only when the
+    /// namespace has at least one resolved library or resource file, preventing
+    /// false-positive `KeywordNotFound` diagnostics on files whose imports
+    /// haven't been resolved yet.
     pub fn new(namespace: &'a Namespace) -> Self {
+        let check_keywords = !namespace.libraries.is_empty() || !namespace.resources.is_empty();
         Self {
             namespace,
             source_path: namespace.source.clone(),
+            check_keywords,
         }
+    }
+
+    /// Override whether keyword-existence checks are run.
+    pub fn with_keyword_checks(mut self, enabled: bool) -> Self {
+        self.check_keywords = enabled;
+        self
     }
 
     /// Analyze `file` and return all diagnostics.
@@ -131,7 +149,7 @@ impl<'a> NamespaceAnalyzer<'a> {
                 for range in ranges {
                     result.diagnostics.push(make_diagnostic(
                         *range,
-                        "KeywordAlreadyDefined",
+                        KEYWORD_ALREADY_DEFINED,
                         format!("Keyword '{normalized}' is already defined"),
                     ));
                 }
@@ -292,7 +310,7 @@ impl<'a> NamespaceAnalyzer<'a> {
                 self.check_keyword_call(kw_name, &kw_call.args, range, result);
 
                 // Handle `Set * Variable` calls — define the variable in the
-                // appropriate scope.
+                // appropriate scope based on the keyword's intent.
                 let normalized = normalize_keyword_name(kw_name);
                 if is_set_variable_keyword(&normalized) {
                     if let Some(def) = definition_from_set_variable(
@@ -301,7 +319,17 @@ impl<'a> NamespaceAnalyzer<'a> {
                         range,
                         self.source_path.clone(),
                     ) {
-                        scope.define(def);
+                        // Suite- and global-scope variables must be visible
+                        // beyond the current local frame; local/test variables
+                        // only live in the current frame.
+                        match def.scope {
+                            VariableScope::Global | VariableScope::Suite => {
+                                scope.define_outer(def);
+                            }
+                            VariableScope::Test | VariableScope::Local => {
+                                scope.define(def);
+                            }
+                        }
                     }
                 }
 
@@ -445,28 +473,31 @@ impl<'a> NamespaceAnalyzer<'a> {
                 }
             }
             KeywordMatch::Ambiguous(matches) => {
-                let sources: Vec<String> = matches
-                    .iter()
-                    .map(|kw| {
-                        kw.library_name
-                            .clone()
-                            .or_else(|| kw.source.as_ref().map(|p| p.display().to_string()))
-                            .unwrap_or_else(|| "<unknown>".to_owned())
-                    })
-                    .collect();
-                result.diagnostics.push(make_diagnostic(
-                    range,
-                    MULTIPLE_KEYWORDS,
-                    format!(
-                        "Multiple keywords with name '{name}' found. Match in: {}",
-                        sources.join(", ")
-                    ),
-                ));
+                if self.check_keywords {
+                    let sources: Vec<String> = matches
+                        .iter()
+                        .map(|kw| {
+                            kw.library_name
+                                .clone()
+                                .or_else(|| kw.source.as_ref().map(|p| p.display().to_string()))
+                                .unwrap_or_else(|| "<unknown>".to_owned())
+                        })
+                        .collect();
+                    result.diagnostics.push(make_diagnostic(
+                        range,
+                        MULTIPLE_KEYWORDS,
+                        format!(
+                            "Multiple keywords with name '{name}' found. Match in: {}",
+                            sources.join(", ")
+                        ),
+                    ));
+                }
             }
             KeywordMatch::NotFound => {
-                // Only emit if the name doesn't look like a variable substitution
-                // (e.g. `${kw_name}` — dynamic dispatch).
-                if !contains_variable(trimmed) {
+                // Only emit if keyword checks are enabled (i.e. the namespace has
+                // resolved imports) and the name doesn't look like a variable
+                // substitution (e.g. `${kw_name}` — dynamic dispatch).
+                if self.check_keywords && !contains_variable(trimmed) {
                     result.diagnostics.push(make_diagnostic(
                         range,
                         KEYWORD_NOT_FOUND,
@@ -499,7 +530,7 @@ impl<'a> NamespaceAnalyzer<'a> {
                     result.diagnostics.push(make_diagnostic(
                         range,
                         VARIABLE_NOT_FOUND,
-                        format!("Variable '${{{}}}' not found", m.base),
+                        format!("Variable '{}{{{}}}' not found", m.identifier, m.base),
                     ));
                 }
             }

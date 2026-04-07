@@ -38,11 +38,13 @@ pub struct ResolvedLibrary {
 }
 
 /// Resolver configuration.
+///
+/// Library module-name resolution (i.e. looking up a library by dotted Python
+/// module name on `sys.path`) is delegated to the Python bridge and is not
+/// performed here.  This config handles file-system-based resolution only.
 #[derive(Debug, Clone, Default)]
 pub struct ResolverConfig {
-    /// Extra sys.path entries to search for libraries (in addition to std ones).
-    pub python_path: Vec<PathBuf>,
-    /// Root directories of the workspace.
+    /// Root directories of the workspace (used as additional search roots).
     pub root_dirs: Vec<PathBuf>,
 }
 
@@ -189,7 +191,6 @@ mod tests {
 
     fn make_resolver(root: &Path) -> ImportResolver {
         ImportResolver::new(ResolverConfig {
-            python_path: vec![],
             root_dirs: vec![root.to_path_buf()],
         })
     }

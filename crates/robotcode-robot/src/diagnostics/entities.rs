@@ -76,7 +76,7 @@ pub struct KeywordDoc {
     pub embedded_regex: Option<regex::Regex>,
     /// Library name the keyword belongs to (`None` for resource-file keywords).
     pub library_name: Option<String>,
-    /// Whether the keyword is private (name starts with `_` or tagged `robot:private`).
+    /// Whether the keyword is private (currently determined by the name starting with `_`).
     pub is_private: bool,
 }
 
@@ -363,18 +363,30 @@ pub fn build_embedded_regex(name: &str) -> Option<regex::Regex> {
     regex::Regex::new(&pattern).ok()
 }
 
-/// Extract deprecation notice from a keyword docstring.
+/// Extract the deprecation message from a keyword docstring.
 ///
-/// Robot Framework uses `*DEPRECATED*` or `*DEPRECATED: reason*` prefix.
+/// Robot Framework marks deprecated keywords with `*DEPRECATED*` or
+/// `*DEPRECATED: optional reason*` at the start of the docstring.
+/// Returns the optional message suffix (e.g. `": reason"`) when the marker is
+/// found, or an empty string when only `*DEPRECATED*` is present, so the
+/// caller can append it cleanly to a base message.
+/// Returns `None` when no deprecation marker is present.
 fn extract_deprecated(doc: &str) -> Option<String> {
-    let upper = doc.to_uppercase();
-    if let Some(pos) = upper.find("*DEPRECATED") {
-        let rest = &doc[pos..];
-        if let Some(end) = rest.find('*').and_then(|_| rest[1..].find('*')) {
-            return Some(rest[1..end + 1].to_owned());
-        }
+    // Find `*DEPRECATED` (case-insensitive) anchored at the start of the docstring.
+    let trimmed = doc.trim_start();
+    let upper = trimmed.to_uppercase();
+    if !upper.starts_with("*DEPRECATED") {
+        return None;
     }
-    None
+    // Find the closing `*`.
+    let after_star = &trimmed[1..]; // skip leading `*`
+    let close = after_star.find('*')?;
+    // Everything between `*DEPRECATED` and the closing `*` is the optional suffix.
+    // E.g. `*DEPRECATED: use Foo instead*` → `: use Foo instead`
+    //       `*DEPRECATED*`               → ``
+    let inner = &after_star[..close]; // e.g. `DEPRECATED: use Foo instead`
+    let message = inner["DEPRECATED".len()..].trim_end(); // strip the prefix word, keep `: reason`
+    Some(message.to_owned())
 }
 
 #[cfg(test)]

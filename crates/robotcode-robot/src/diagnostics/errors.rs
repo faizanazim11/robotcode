@@ -54,6 +54,7 @@ pub const VARIABLE_OVERRIDDEN: &str = "VariableOverridden";
 pub const MODEL_ERROR: &str = "ModelError";
 pub const TOKEN_ERROR: &str = "TokenError";
 pub const ASSIGN_MARK_ALLOWED_ONLY_ON_LAST_VAR: &str = "AssignmentMarkAllowedOnlyOnLastVariable";
+pub const KEYWORD_ALREADY_DEFINED: &str = "KeywordAlreadyDefined";
 
 // ---------------------------------------------------------------------------
 // Severity mapping

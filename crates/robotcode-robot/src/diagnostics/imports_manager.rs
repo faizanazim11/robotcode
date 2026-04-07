@@ -87,8 +87,9 @@ pub struct ImportsManager {
     pub library_cache: LibraryCache,
     /// Resolved resource file cache.
     resource_slots: DashMap<PathBuf, Slot<ResourceData>>,
-    /// Resolved variables file cache.
-    variables_slots: DashMap<PathBuf, Slot<VariablesData>>,
+    /// Resolved variables file cache, keyed by `(path, args, base_dir)` to
+    /// handle the same file imported with different arguments correctly.
+    variables_slots: DashMap<(PathBuf, Vec<String>, Option<String>), Slot<VariablesData>>,
     /// The bridge (needed for variables_doc calls).
     bridge: Arc<dyn Bridge>,
 }
@@ -147,13 +148,21 @@ impl ImportsManager {
     // -----------------------------------------------------------------------
 
     /// Fetch or compute a [`VariablesData`] for the given path via the bridge.
+    ///
+    /// The cache is keyed by `(path, args, base_dir)` so that the same file
+    /// imported with different arguments does not share a cached result.
     pub async fn get_variables(
         &self,
         path: &Path,
         args: &[String],
         base_dir: Option<&str>,
     ) -> Result<Arc<VariablesData>, ImportsError> {
-        let slot = get_or_create_slot(&self.variables_slots, path.to_path_buf());
+        let key = (
+            path.to_path_buf(),
+            args.to_vec(),
+            base_dir.map(str::to_owned),
+        );
+        let slot = get_or_create_slot(&self.variables_slots, key);
         let mut guard = slot.lock().await;
 
         if let Some(data) = guard.as_ref() {
@@ -187,9 +196,11 @@ impl ImportsManager {
         self.resource_slots.remove(path);
     }
 
-    /// Remove the cached variables data for `path`.
+    /// Remove all cached variables data entries for `path`, regardless of the
+    /// args or base_dir they were resolved with.
     pub fn invalidate_variables(&self, path: &Path) {
-        self.variables_slots.remove(path);
+        self.variables_slots
+            .retain(|(p, _, _), _| p.as_path() != path);
     }
 
     /// Clear all caches.
