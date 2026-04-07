@@ -137,15 +137,32 @@ mod tests {
 
     #[test]
     fn test_normalized_path_removes_dots() {
-        let p = normalized_path("/home/user/../user/./project");
-        assert_eq!(p, PathBuf::from("/home/user/project"));
+        #[cfg(unix)]
+        {
+            let p = normalized_path("/home/user/../user/./project");
+            assert_eq!(p, PathBuf::from("/home/user/project"));
+        }
+        #[cfg(windows)]
+        {
+            let p = normalized_path(r"C:\home\user\..\user\.\project");
+            assert_eq!(p, PathBuf::from(r"C:\home\user\project"));
+        }
     }
 
     #[test]
     fn test_normalized_path_does_not_escape_root() {
         // `..` at the filesystem root must not produce a relative path.
-        let p = normalized_path("/../a");
-        assert_eq!(p, PathBuf::from("/a"));
+        #[cfg(unix)]
+        {
+            let p = normalized_path("/../a");
+            assert_eq!(p, PathBuf::from("/a"));
+        }
+        #[cfg(windows)]
+        {
+            // On Windows the root is a drive + separator; `..` must not pop past it.
+            let p = normalized_path(r"C:\..\a");
+            assert_eq!(p, PathBuf::from(r"C:\a"));
+        }
     }
 
     #[test]

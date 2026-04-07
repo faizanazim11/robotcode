@@ -104,11 +104,23 @@ mod tests {
 
     #[test]
     fn test_workspace_folder_for_uri() {
-        let folder_uri = Uri::parse("file:///home/user/project").unwrap();
+        // Use drive-letter URIs on Windows; plain unix paths on other platforms.
+        #[cfg(unix)]
+        let (folder_uri_str, file_uri_str) = (
+            "file:///home/user/project",
+            "file:///home/user/project/tests/test.robot",
+        );
+        #[cfg(windows)]
+        let (folder_uri_str, file_uri_str) = (
+            "file:///C:/home/user/project",
+            "file:///C:/home/user/project/tests/test.robot",
+        );
+
+        let folder_uri = Uri::parse(folder_uri_str).unwrap();
         let folder = WorkspaceFolder::new("project", folder_uri);
         let ws = Workspace::new(None, vec![folder], serde_json::Value::Null);
 
-        let file_uri = Uri::parse("file:///home/user/project/tests/test.robot").unwrap();
+        let file_uri = Uri::parse(file_uri_str).unwrap();
         let found = ws.folder_for_uri(&file_uri);
         assert!(found.is_some());
         assert_eq!(found.unwrap().name, "project");
