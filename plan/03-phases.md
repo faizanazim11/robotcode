@@ -14,27 +14,27 @@ The migration is organized into **8 phases**. Each phase produces a shippable ar
 
 ### Deliverables
 
-- [ ] Initialize `Cargo.toml` workspace at repo root
-- [ ] Create `crates/robotcode-core/` with:
-  - [ ] `uri.rs` — URI parsing and normalization (port of `core/uri.py`)
-  - [ ] `text_document.rs` — UTF-16 text document with incremental edits using `ropey`
-  - [ ] `lsp_types.rs` — Re-export `lsp-types` crate; add any custom extensions
-  - [ ] `workspace.rs` — Multi-root workspace model
-  - [ ] `documents_manager.rs` — Thread-safe open document registry (`DashMap`)
-  - [ ] `async_tools.rs` — Cancellation tokens, async mutex helpers
-  - [ ] `event.rs` — Event/callback system
-  - [ ] `filewatcher.rs` — File system watching using `notify`
-  - [ ] `utils/logging.rs` — `tracing` subscriber setup
-  - [ ] `utils/path.rs` — File ID utilities (inode-stable file identity)
-  - [ ] `utils/dataclasses.rs` — Common serde helpers
-- [ ] Set up CI: `cargo check`, `cargo test`, `cargo clippy`, `cargo fmt --check`
-- [ ] Add `Cargo.toml` to `.gitignore` exclusions appropriately
-- [ ] Establish snapshot test infrastructure using `insta` crate
+- [x] Initialize `Cargo.toml` workspace at repo root
+- [x] Create `crates/robotcode-core/` with:
+  - [x] `uri.rs` — URI parsing and normalization (port of `core/uri.py`)
+  - [x] `text_document.rs` — UTF-16 text document with incremental edits using `ropey`
+  - [x] `lsp_types.rs` — Re-export `lsp-types` crate; add any custom extensions
+  - [x] `workspace.rs` — Multi-root workspace model
+  - [x] `documents_manager.rs` — Thread-safe open document registry (`DashMap`)
+  - [x] `async_tools.rs` — Cancellation tokens, async mutex helpers
+  - [x] `event.rs` — Event/callback system
+  - [x] `filewatcher.rs` — File system watching using `notify`
+  - [x] `utils/logging.rs` — `tracing` subscriber setup
+  - [x] `utils/path.rs` — File ID utilities (inode-stable file identity)
+  - [x] `utils/dataclasses.rs` — Common serde helpers
+- [x] Set up CI: `cargo check`, `cargo test`, `cargo clippy`, `cargo fmt --check` (`.github/workflows/rust-checks.yml`)
+- [x] Add `Cargo.toml` to `.gitignore` exclusions appropriately (`target/` already excluded)
+- [x] Establish snapshot test infrastructure using `insta` crate
 
 ### Success Criteria
-- `cargo build` succeeds from clean checkout
-- All `robotcode-core` unit tests pass
-- CI pipeline runs Rust checks alongside existing Python checks
+- `cargo build` succeeds from clean checkout ✅
+- All `robotcode-core` unit tests pass (38 tests: 29 unit + 3 doc + 6 snapshot) ✅
+- CI pipeline runs Rust checks alongside existing Python checks ✅
 
 ---
 

@@ -1,0 +1,8 @@
+---
+source: crates/robotcode-core/tests/snapshots_test.rs
+expression: "out.join(\"\\n\")"
+---
+hello_world -> helloWorld
+my_long_field_name -> myLongFieldName
+ -> 
+single -> single

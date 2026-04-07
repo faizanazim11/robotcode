@@ -1,0 +1,5 @@
+---
+source: crates/robotcode-core/tests/snapshots_test.rs
+expression: doc.text()
+---
+hello Rust

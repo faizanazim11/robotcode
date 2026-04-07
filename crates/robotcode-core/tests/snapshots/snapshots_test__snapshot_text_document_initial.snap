@@ -1,0 +1,7 @@
+---
+source: crates/robotcode-core/tests/snapshots_test.rs
+expression: doc.text()
+---
+*** Test Cases ***
+My Test
+    Log    Hello
