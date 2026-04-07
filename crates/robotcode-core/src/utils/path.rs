@@ -111,8 +111,8 @@ pub fn normalized_path(path: impl AsRef<Path>) -> PathBuf {
         // Upper-case the drive letter (e.g., `c:\` → `C:\`)
         let s = result.to_string_lossy();
         if s.len() >= 2 && s.as_bytes()[1] == b':' {
-            let upper = s[..1].to_uppercase() + &s[1..];
-            return PathBuf::from(upper.as_ref());
+            let upper: String = s[..1].to_uppercase() + &s[1..];
+            return PathBuf::from(upper);
         }
     }
 
