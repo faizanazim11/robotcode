@@ -1,0 +1,95 @@
+---
+source: crates/robotcode-rf-parser/tests/parser_test.rs
+expression: file
+---
+{
+  "sections": [
+    {
+      "type": "Settings",
+      "header": {
+        "name": "*** Settings ***",
+        "position": {
+          "line": 0,
+          "column": 0,
+          "end_line": 0,
+          "end_column": 16
+        }
+      },
+      "body": [
+        {
+          "type": "LibraryImport",
+          "name": "Collections",
+          "args": [],
+          "alias": null,
+          "position": {
+            "line": 1,
+            "column": 0,
+            "end_line": 1,
+            "end_column": 7
+          }
+        },
+        {
+          "type": "LibraryImport",
+          "name": "String",
+          "args": [],
+          "alias": "Str",
+          "position": {
+            "line": 2,
+            "column": 0,
+            "end_line": 2,
+            "end_column": 7
+          }
+        },
+        {
+          "type": "ResourceImport",
+          "path": "helpers.robot",
+          "position": {
+            "line": 3,
+            "column": 0,
+            "end_line": 3,
+            "end_column": 8
+          }
+        },
+        {
+          "type": "Documentation",
+          "value": "Suite documentation continued on next line",
+          "position": {
+            "line": 4,
+            "column": 0,
+            "end_line": 4,
+            "end_column": 13
+          }
+        },
+        {
+          "type": "SuiteSetup",
+          "kind": "SuiteSetup",
+          "name": "Log",
+          "args": [
+            "starting"
+          ],
+          "position": {
+            "line": 6,
+            "column": 0,
+            "end_line": 6,
+            "end_column": 11
+          }
+        },
+        {
+          "type": "TestTags",
+          "kind": "Test",
+          "tags": [
+            "smoke",
+            "regression"
+          ],
+          "position": {
+            "line": 7,
+            "column": 0,
+            "end_line": 7,
+            "end_column": 9
+          }
+        }
+      ]
+    }
+  ],
+  "source": null
+}

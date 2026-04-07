@@ -708,6 +708,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "robotcode-rf-parser"
+version = "0.1.0"
+dependencies = [
+ "insta",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "ropey"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

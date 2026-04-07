@@ -1,0 +1,65 @@
+---
+source: crates/robotcode-rf-parser/tests/parser_test.rs
+expression: file
+---
+{
+  "sections": [
+    {
+      "type": "Variables",
+      "header": {
+        "name": "*** Variables ***",
+        "position": {
+          "line": 0,
+          "column": 0,
+          "end_line": 0,
+          "end_column": 17
+        }
+      },
+      "body": [
+        {
+          "type": "Variable",
+          "name": "${SCALAR}",
+          "value": [
+            "hello"
+          ],
+          "position": {
+            "line": 1,
+            "column": 0,
+            "end_line": 1,
+            "end_column": 9
+          }
+        },
+        {
+          "type": "Variable",
+          "name": "@{LIST}",
+          "value": [
+            "a",
+            "b",
+            "c"
+          ],
+          "position": {
+            "line": 2,
+            "column": 0,
+            "end_line": 2,
+            "end_column": 7
+          }
+        },
+        {
+          "type": "Variable",
+          "name": "&{DICT}",
+          "value": [
+            "key=value",
+            "other=stuff"
+          ],
+          "position": {
+            "line": 3,
+            "column": 0,
+            "end_line": 3,
+            "end_column": 7
+          }
+        }
+      ]
+    }
+  ],
+  "source": null
+}
