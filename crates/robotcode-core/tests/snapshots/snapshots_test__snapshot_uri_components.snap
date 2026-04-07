@@ -1,0 +1,8 @@
+---
+source: crates/robotcode-core/tests/snapshots_test.rs
+expression: out
+---
+scheme=file
+path=/home/user/project/test.robot
+query=Some("q=1")
+fragment=Some("frag")

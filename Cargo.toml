@@ -1,0 +1,26 @@
+[workspace]
+members = [
+    "crates/robotcode-core",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["RobotCode Contributors"]
+license = "Apache-2.0"
+
+[workspace.dependencies]
+lsp-types = "0.97"
+ropey = "1.6"
+dashmap = "6"
+tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+url = "2"
+notify = "6"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+insta = { version = "1", features = ["json"] }
+thiserror = "1"
