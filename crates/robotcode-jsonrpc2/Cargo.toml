@@ -1,0 +1,10 @@
+[package]
+name = "robotcode-jsonrpc2"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Thin JSON-RPC 2.0 / LSP wrapper for RobotCode"
+
+[dependencies]
+tower-lsp.workspace = true

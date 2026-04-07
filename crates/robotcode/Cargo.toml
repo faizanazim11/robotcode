@@ -1,0 +1,21 @@
+[package]
+name = "robotcode"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "RobotCode CLI — Robot Framework IDE toolkit"
+
+[[bin]]
+name = "robotcode"
+path = "src/main.rs"
+
+[dependencies]
+robotcode-jsonrpc2 = { path = "../robotcode-jsonrpc2" }
+robotcode-language-server = { path = "../robotcode-language-server" }
+tower-lsp.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+clap.workspace = true
+anyhow.workspace = true

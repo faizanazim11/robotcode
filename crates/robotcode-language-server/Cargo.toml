@@ -1,0 +1,14 @@
+[package]
+name = "robotcode-language-server"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "RobotCode Language Server Protocol implementation"
+
+[dependencies]
+robotcode-core = { path = "../robotcode-core" }
+robotcode-jsonrpc2 = { path = "../robotcode-jsonrpc2" }
+tower-lsp.workspace = true
+tokio.workspace = true
+tracing.workspace = true

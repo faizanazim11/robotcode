@@ -2,6 +2,9 @@
 members = [
     "crates/robotcode-core",
     "crates/robotcode-rf-parser",
+    "crates/robotcode-jsonrpc2",
+    "crates/robotcode-language-server",
+    "crates/robotcode",
 ]
 resolver = "2"
 
@@ -27,3 +30,6 @@ insta = { version = "1", features = ["json"] }
 thiserror = "1"
 percent-encoding = "2"
 logos = "0.14"
+tower-lsp = "0.20"
+clap = { version = "4", features = ["derive"] }
+anyhow = "1"
