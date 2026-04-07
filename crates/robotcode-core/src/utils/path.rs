@@ -26,10 +26,10 @@ pub fn file_id(path: impl AsRef<Path>) -> Option<FileId> {
 
     #[cfg(windows)]
     {
-        // Windows doesn't expose inode numbers through the standard library.
-        // Return a best-effort value using the file index from the Windows API,
-        // or fall back to zeros so callers can at least check `None` vs `Some`.
-        let _ = path;
+        // Windows doesn't expose stable inode numbers through the standard library.
+        // Verify the path can be stat'd so the function contract is consistent
+        // across platforms (returns None for non-existent paths).
+        let _meta = std::fs::metadata(path.as_ref()).ok()?;
         Some(FileId { dev: 0, ino: 0 })
     }
 
@@ -70,16 +70,30 @@ pub fn normalized_path(path: impl AsRef<Path>) -> PathBuf {
             .join(p)
     };
 
-    // Lexically clean the path (remove `.` and `..`)
+    // Lexically clean the path (remove `.` and `..`).
+    // Track a minimum depth to avoid popping past the root or drive prefix.
     let mut components: Vec<std::ffi::OsString> = Vec::new();
+    let mut min_depth: usize = 0;
+
     for component in absolute.components() {
         use std::path::Component;
         match component {
+            // Root and prefix components (e.g. `/` on Unix, `C:` + `\` on Windows)
+            // are never poppable — record how many we have pushed.
+            Component::RootDir | Component::Prefix(_) => {
+                components.push(component.as_os_str().to_os_string());
+                min_depth += 1;
+            }
             Component::CurDir => {}
             Component::ParentDir => {
-                components.pop();
+                // Only pop a normal component; never go past the root/prefix.
+                if components.len() > min_depth {
+                    components.pop();
+                }
             }
-            other => components.push(other.as_os_str().to_os_string()),
+            Component::Normal(_) => {
+                components.push(component.as_os_str().to_os_string());
+            }
         }
     }
 
@@ -125,6 +139,13 @@ mod tests {
     fn test_normalized_path_removes_dots() {
         let p = normalized_path("/home/user/../user/./project");
         assert_eq!(p, PathBuf::from("/home/user/project"));
+    }
+
+    #[test]
+    fn test_normalized_path_does_not_escape_root() {
+        // `..` at the filesystem root must not produce a relative path.
+        let p = normalized_path("/../a");
+        assert_eq!(p, PathBuf::from("/a"));
     }
 
     #[test]

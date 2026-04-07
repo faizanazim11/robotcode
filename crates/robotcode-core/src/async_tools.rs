@@ -16,9 +16,9 @@ pub struct DropGuard(#[allow(dead_code)] tokio_util::sync::DropGuard);
 
 impl DropGuard {
     pub fn disarm(self) {
-        // The inner DropGuard::disarm() consumes self and prevents cancellation.
-        // We recreate the behaviour by just dropping without cancelling.
-        std::mem::forget(self);
+        // Delegate to the inner tokio DropGuard::disarm(), which consumes it
+        // and prevents cancellation without leaking memory.
+        self.0.disarm();
     }
 }
 

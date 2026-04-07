@@ -4,7 +4,6 @@
 
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
 
@@ -71,18 +70,6 @@ impl FileWatcher {
         watcher.watch(path.as_ref(), mode)?;
 
         Ok(FileWatcherHandle { _watcher: watcher })
-    }
-
-    /// Start watching `path` with a configurable debounce delay.
-    pub fn watch_with_delay(
-        &self,
-        path: impl AsRef<Path>,
-        recursive: bool,
-        _delay: Duration,
-    ) -> Result<FileWatcherHandle, notify::Error> {
-        // For simplicity we ignore the delay here; a production
-        // implementation would use notify-debouncer-full or similar.
-        self.watch(path, recursive)
     }
 }
 

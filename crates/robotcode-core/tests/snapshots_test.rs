@@ -61,7 +61,7 @@ fn snapshot_text_document_after_incremental_edit() {
         range_length: None,
         text: "Rust".to_string(),
     };
-    doc.apply_change(Some(2), &change);
+    doc.apply_change(Some(2), &change).unwrap();
     assert_snapshot!(doc.text());
 }
 

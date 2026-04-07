@@ -36,14 +36,16 @@ pub trait RangeExt {
 
 impl RangeExt for Range {
     fn contains(&self, pos: &Position) -> bool {
+        // LSP ranges are half-open: [start, end).  The end position is exclusive.
         (pos.line > self.start.line
             || (pos.line == self.start.line && pos.character >= self.start.character))
             && (pos.line < self.end.line
-                || (pos.line == self.end.line && pos.character <= self.end.character))
+                || (pos.line == self.end.line && pos.character < self.end.character))
     }
 
     fn overlaps(&self, other: &Range) -> bool {
-        self.start <= other.end && other.start <= self.end
+        // Two half-open ranges [a,b) and [c,d) overlap iff a < d && c < b.
+        self.start < other.end && other.start < self.end
     }
 }
 

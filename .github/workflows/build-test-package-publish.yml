@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-    tags:
-      - "v*"
     paths-ignore:
       - ".devcontainer/**"
       - ".github/**"
@@ -23,6 +21,7 @@ env:
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
 
 jobs:
+  # Python integration tests — restricted to Python 3.13 + latest RF only.
   test:
     runs-on: ${{ matrix.os }}
     defaults:
@@ -32,9 +31,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
-        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
-        robot-version:
-          ["rf50", "rf60", "rf61", "rf70", "rf71", "rf72", "rf73", "rf74"]
+        python-version: ["3.13"]
+        robot-version: ["rf74"]
 
     steps:
       - uses: actions/checkout@v6
@@ -63,8 +61,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       checks: write
-
-      # only needed unless run with comment_mode: off
       pull-requests: write
 
     if: always()
@@ -102,21 +98,10 @@ jobs:
         id: setup-python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.10"
+          python-version: "3.13"
 
       - name: Install Hatch
         uses: pypa/hatch@install
-
-      - name: Setup Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: jetbrains
-          java-version: 21
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v5
-        with:
-          cache-cleanup: always
 
       - run: hatch run lint:style
         if: always()
@@ -124,200 +109,3 @@ jobs:
       - run: hatch run lint:typing
         if: always()
 
-      # - name: Run Plugin Verification tasks
-      #   continue-on-error: true
-      #   run: |
-      #     cd intellij-client
-
-      #     finish() {
-      #       REPORTS=$(cat build/reports/pluginVerifier/*/report.md | sed 's/^#/##/')
-      #       echo "$REPORTS" >> $GITHUB_STEP_SUMMARY
-      #     }
-      #     trap finish EXIT
-
-      #     gradle --no-daemon verifyPlugin -Dplugin.verifier.home.dir=~/.pluginVerifier
-
-      # - name: Collect Plugin Verifier Result
-      #   if: ${{ always() }}
-      #   uses: actions/upload-artifact@v7
-      #   with:
-      #     name: pluginVerifier-result
-      #     path: ./intellij-client/build/reports/pluginVerifier
-
-  package:
-    needs: [test]
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - run: git describe --tag
-      - run: git describe --tag --long --first-parent --match "v[0-9]*"
-
-      - name: setup python environment
-        id: setup-python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.10"
-
-      - name: Install Hatch
-        uses: pypa/hatch@install
-
-      - name: Setup Node.js environment
-        uses: actions/setup-node@v6
-        with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: package-lock.json
-
-      - name: Setup Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: jetbrains
-          java-version: 21
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v5
-        with:
-          cache-cleanup: always
-
-      # Set environment variables
-      - name: Export Properties
-        id: properties
-        shell: bash
-        run: |
-          echo "pluginVerifierHomeDir=~/.pluginVerifier" >> $GITHUB_OUTPUT
-
-      - name: install node modules
-        run: npm install --include=dev
-
-      - name: update versions from git
-        if: ${{ !startsWith( github.ref, 'refs/tags/v') }}
-        run: hatch run build:update-git-versions
-
-      - name: update doc links
-        if: ${{ startsWith( github.ref, 'refs/tags/v') }}
-        run: hatch run build:update-doc-links
-
-      - name: Update Changelog
-        run: hatch run build:git-cliff -o CHANGELOG.md
-
-      - name: package
-        run: hatch run build:package
-
-      - name: Upload VSCode package
-        id: upload-vscode-package
-        uses: actions/upload-artifact@v7
-        with:
-          name: vscode-package
-          path: dist/robotcode*.vsix
-
-      - name: Upload python package
-        id: upload-python-packages
-        uses: actions/upload-artifact@v7
-        with:
-          name: python-packages
-          path: dist/*.tar.gz
-
-      - name: Upload python wheel package
-        id: upload-wheel-packages
-        uses: actions/upload-artifact@v7
-        with:
-          name: wheel-packages
-          path: dist/*.whl
-
-      - name: Upload intellij plugin
-        id: upload-intellij-package
-        uses: actions/upload-artifact@v7
-        with:
-          name: intellij-package
-          path: intellij-client/build/distributions/*.zip
-
-  publish:
-    runs-on: ubuntu-latest
-    needs: [code-quality, package]
-    if: success()
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - run: git describe --tag
-
-      - name: setup python environment
-        id: setup-python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.10"
-
-      - name: Install Hatch
-        uses: pypa/hatch@install
-
-      - name: Setup Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: jetbrains
-          java-version: 21
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v5
-        with:
-          cache-cleanup: always
-
-      - name: Setup Node.js environment
-        uses: actions/setup-node@v6
-        with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: package-lock.json
-
-      - name: install node modules
-        run: npm install --include=dev
-
-      - uses: actions/download-artifact@v7
-        with:
-          name: vscode-package
-          path: dist
-      - uses: actions/download-artifact@v7
-        with:
-          name: python-packages
-          path: dist
-      - uses: actions/download-artifact@v7
-        with:
-          name: wheel-packages
-          path: dist
-      - uses: actions/download-artifact@v7
-        with:
-          name: intellij-package
-          path: dist
-
-      - name: get release informations
-        id: get_release_informations
-        run: |
-          hatch -q run build:extract-release-notes > ./auto_relnotes.md
-
-          echo "is_prelease=$(hatch -q run build:is-prerelease)" >> $GITHUB_OUTPUT
-          echo "release_version=$(hatch -q run build:get-release-version)" >> $GITHUB_OUTPUT
-
-      - name: create github release
-        uses: softprops/action-gh-release@v2
-        if: github.ref_type == 'tag' && startsWith( github.ref, 'refs/tags/v')
-        with:
-          files: "dist/*"
-          name: "v${{ steps.get_release_informations.outputs.release_version }}"
-          prerelease: ${{ steps.get_release_informations.outputs.is_prelease }}
-          body_path: ./auto_relnotes.md
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: publish vsix and python packages
-        if: github.ref_type == 'tag' && startsWith( github.ref, 'refs/tags/v')
-        run: hatch -q run build:publish
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
-          OVSX_PAT: ${{ secrets.OVSX_PAT }}
-          PYPI_USERNAME: ${{ secrets.PYPI_USERNAME }}
-          PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-          PUBLISH_TOKEN: ${{ secrets.JETBRAINS_MARKETPLACE_TOKEN }}

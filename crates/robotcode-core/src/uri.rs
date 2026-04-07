@@ -4,6 +4,7 @@
 
 use std::path::{Path, PathBuf};
 
+use percent_encoding::percent_decode_str;
 use url::Url;
 
 /// Error type for invalid URIs.
@@ -43,16 +44,25 @@ impl Uri {
 
     /// Convert this URI to a filesystem path.
     ///
-    /// Handles UNC paths and Windows drive letters, matching VS Code / LSP conventions.
+    /// For `file://` URIs the standard OS path is returned (handles UNC paths
+    /// and Windows drive letters). For `untitled:` URIs (unsaved LSP documents)
+    /// the percent-decoded path component is returned as a `PathBuf`.
     pub fn to_path(&self) -> Result<PathBuf, UriError> {
-        let scheme = self.inner.scheme();
-        if scheme != "file" && scheme != "untitled" {
-            return Err(UriError::InvalidScheme(scheme.to_string()));
+        match self.inner.scheme() {
+            "file" => self
+                .inner
+                .to_file_path()
+                .map_err(|_| UriError::PathConversion(self.inner.as_str().to_string())),
+            "untitled" => {
+                // LSP uses `untitled:` URIs for unsaved documents (e.g. `untitled:Untitled-1`).
+                // The path component is the document name; percent-decode it.
+                let decoded = percent_decode_str(self.inner.path())
+                    .decode_utf8_lossy()
+                    .into_owned();
+                Ok(PathBuf::from(decoded))
+            }
+            other => Err(UriError::InvalidScheme(other.to_string())),
         }
-
-        self.inner
-            .to_file_path()
-            .map_err(|_| UriError::PathConversion(self.inner.as_str().to_string()))
     }
 
     /// Return the scheme of this URI.
@@ -87,8 +97,11 @@ impl Uri {
 
     /// Return a normalized version of this URI.
     ///
-    /// For `file://` URIs this canonicalizes the path. Falls back to the
-    /// original if the path does not exist on disk.
+    /// For `file://` URIs this applies **lexical** normalization (resolves `.` and `..`
+    /// components and makes the path absolute) using [`crate::utils::path::normalized_path`].
+    /// This does **not** call `canonicalize()` and does **not** require the path to exist.
+    ///
+    /// Non-`file://` URIs are returned unchanged.
     pub fn normalized(&self) -> Self {
         if self.inner.scheme() == "file" {
             if let Ok(p) = self.to_path() {
@@ -172,5 +185,19 @@ mod tests {
         let a = Uri::parse("file:///home/user/test.robot").unwrap();
         let b = Uri::parse("file:///home/user/test.robot").unwrap();
         assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_untitled_to_path() {
+        let uri = Uri::parse("untitled:Untitled-1").unwrap();
+        let path = uri.to_path().unwrap();
+        assert_eq!(path, std::path::PathBuf::from("Untitled-1"));
+    }
+
+    #[test]
+    fn test_untitled_percent_encoded() {
+        let uri = Uri::parse("untitled:My%20File.robot").unwrap();
+        let path = uri.to_path().unwrap();
+        assert_eq!(path, std::path::PathBuf::from("My File.robot"));
     }
 }

@@ -695,6 +695,7 @@ dependencies = [
  "insta",
  "lsp-types",
  "notify",
+ "percent-encoding",
  "ropey",
  "serde",
  "serde_json",

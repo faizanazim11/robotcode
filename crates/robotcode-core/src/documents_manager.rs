@@ -86,7 +86,7 @@ impl DocumentsManager {
             .get(&normalized)
             .ok_or_else(|| DocumentsManagerError::NotFound(normalized.clone()))?;
 
-        doc.apply_changes(version, changes);
+        doc.apply_changes(version, changes)?;
         Ok(Arc::clone(&*doc))
     }
 

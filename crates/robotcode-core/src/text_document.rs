@@ -24,6 +24,10 @@ pub enum TextDocumentError {
 ///
 /// LSP positions use UTF-16 code unit offsets for the character field.
 /// The rope stores text as UTF-8 so we need to convert.
+///
+/// If `utf16_col` points into the middle of a surrogate pair (e.g. into an
+/// emoji that is two UTF-16 code units), the offset is clamped to the start
+/// of that code point — matching the Python `position_from_utf16` behaviour.
 fn utf16_to_utf8_char_offset(rope: &Rope, line: u32, utf16_col: u32) -> usize {
     let line_idx = (line as usize).min(rope.len_lines().saturating_sub(1));
     let line_slice = rope.line(line_idx);
@@ -32,10 +36,12 @@ fn utf16_to_utf8_char_offset(rope: &Rope, line: u32, utf16_col: u32) -> usize {
     let mut char_offset = 0usize;
 
     for ch in line_slice.chars() {
-        if utf16_offset >= utf16_col {
+        let utf16_len = ch.len_utf16() as u32;
+        // If adding this character's UTF-16 units would exceed the target column,
+        // stop here (clamp to the start of this code point if inside it).
+        if utf16_offset + utf16_len > utf16_col {
             break;
         }
-        let utf16_len = ch.len_utf16() as u32;
         utf16_offset += utf16_len;
         char_offset += 1;
     }
@@ -107,7 +113,12 @@ impl TextDocument {
     /// Apply a single incremental [`TextDocumentContentChangeEvent`].
     ///
     /// If the event has no range it is treated as a full replacement.
-    pub fn apply_change(&self, version: Option<i32>, change: &TextDocumentContentChangeEvent) {
+    /// Returns an error if the range is invalid (start after end).
+    pub fn apply_change(
+        &self,
+        version: Option<i32>,
+        change: &TextDocumentContentChangeEvent,
+    ) -> Result<(), TextDocumentError> {
         if let Some(v) = version {
             *self.version.write().unwrap() = Some(v);
         }
@@ -118,26 +129,36 @@ impl TextDocument {
                 *self.rope.write().unwrap() = Rope::from_str(&change.text);
             }
             Some(range) => {
+                if range.start > range.end {
+                    return Err(TextDocumentError::InvalidRange(range.start, range.end));
+                }
                 let mut rope = self.rope.write().unwrap();
                 let start =
                     utf16_to_utf8_char_offset(&rope, range.start.line, range.start.character);
                 let end = utf16_to_utf8_char_offset(&rope, range.end.line, range.end.character);
-                if start <= end {
-                    rope.remove(start..end);
-                    rope.insert(start, &change.text);
-                }
+                rope.remove(start..end);
+                rope.insert(start, &change.text);
             }
         }
+        Ok(())
     }
 
     /// Apply a list of incremental changes in order.
-    pub fn apply_changes(&self, version: Option<i32>, changes: &[TextDocumentContentChangeEvent]) {
+    ///
+    /// Propagates the first error encountered; the document version is only
+    /// updated if all changes are applied successfully.
+    pub fn apply_changes(
+        &self,
+        version: Option<i32>,
+        changes: &[TextDocumentContentChangeEvent],
+    ) -> Result<(), TextDocumentError> {
         for change in changes {
-            self.apply_change(None, change);
+            self.apply_change(None, change)?;
         }
         if let Some(v) = version {
             *self.version.write().unwrap() = Some(v);
         }
+        Ok(())
     }
 
     /// Convert an LSP UTF-16 [`Position`] to a UTF-8 character offset.
@@ -223,8 +244,33 @@ mod tests {
             range_length: None,
             text: "goodbye".to_string(),
         };
-        doc.apply_change(Some(2), &change);
+        doc.apply_change(Some(2), &change).unwrap();
         assert_eq!(doc.text(), "goodbye world\n");
+    }
+
+    #[test]
+    fn test_apply_change_invalid_range_returns_error() {
+        let doc = make_doc("hello world\n");
+        let change = TextDocumentContentChangeEvent {
+            range: Some(Range {
+                start: Position {
+                    line: 0,
+                    character: 5,
+                },
+                end: Position {
+                    line: 0,
+                    character: 0,
+                },
+            }),
+            range_length: None,
+            text: "oops".to_string(),
+        };
+        assert!(matches!(
+            doc.apply_change(None, &change),
+            Err(TextDocumentError::InvalidRange(_, _))
+        ));
+        // Document must be unchanged after the error.
+        assert_eq!(doc.text(), "hello world\n");
     }
 
     #[test]
