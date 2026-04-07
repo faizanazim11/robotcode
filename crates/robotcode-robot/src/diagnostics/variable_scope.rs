@@ -217,14 +217,14 @@ pub const SET_LOCAL_VARIABLE: &str = "setlocalvariable";
 
 /// Return `true` if a normalized keyword name is a `Set *Variable` call.
 pub fn is_set_variable_keyword(normalized_name: &str) -> bool {
-    matches!(
-        normalized_name,
-        n if n == SET_SUITE_VARIABLE
-            || n == SET_GLOBAL_VARIABLE
-            || n == SET_TEST_VARIABLE
-            || n == SET_TASK_VARIABLE
-            || n == SET_LOCAL_VARIABLE
-    )
+    const SET_VARIABLE_KEYWORDS: &[&str] = &[
+        SET_SUITE_VARIABLE,
+        SET_GLOBAL_VARIABLE,
+        SET_TEST_VARIABLE,
+        SET_TASK_VARIABLE,
+        SET_LOCAL_VARIABLE,
+    ];
+    SET_VARIABLE_KEYWORDS.contains(&normalized_name)
 }
 
 /// Determine the [`VariableScope`] that a `Set *Variable` keyword writes to.

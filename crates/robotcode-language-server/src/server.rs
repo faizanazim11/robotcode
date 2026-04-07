@@ -80,6 +80,10 @@ impl LanguageServer for RobotCodeServer {
         );
         Ok(InitializeResult {
             capabilities: ServerCapabilities {
+                // FULL sync is required because the diagnostics engine in Phase 5
+                // works on the complete document text for each analysis pass.
+                // Incremental sync will be supported once the parser gains an
+                // incremental update API in a later phase.
                 text_document_sync: Some(TextDocumentSyncCapability::Kind(
                     TextDocumentSyncKind::FULL,
                 )),

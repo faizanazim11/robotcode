@@ -499,7 +499,7 @@ impl<'a> NamespaceAnalyzer<'a> {
                     result.diagnostics.push(make_diagnostic(
                         range,
                         VARIABLE_NOT_FOUND,
-                        format!("Variable '${{{}}}'  not found", m.base),
+                        format!("Variable '${{{}}}' not found", m.base),
                     ));
                 }
             }
