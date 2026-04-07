@@ -35,3 +35,5 @@ logos = "0.14"
 tower-lsp = "0.20"
 clap = { version = "4", features = ["derive"] }
 anyhow = "1"
+regex = "1"
+tempfile = "3"

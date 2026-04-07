@@ -9,5 +9,8 @@ description = "RobotCode Language Server Protocol implementation"
 [dependencies]
 robotcode-core = { path = "../robotcode-core" }
 robotcode-jsonrpc2 = { path = "../robotcode-jsonrpc2" }
+robotcode-rf-parser = { path = "../robotcode-rf-parser" }
+robotcode-robot = { path = "../robotcode-robot" }
+robotcode-python-bridge = { path = "../robotcode-python-bridge" }
 tokio.workspace = true
 tracing.workspace = true
