@@ -932,12 +932,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "robotcode-python-bridge"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "robotcode-rf-parser"
 version = "0.1.0"
 dependencies = [
  "insta",
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "robotcode-robot"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "dashmap 6.1.0",
+ "robotcode-python-bridge",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

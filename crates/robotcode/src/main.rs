@@ -67,17 +67,18 @@ async fn main() -> Result<()> {
             if let Some(ref python) = args.python {
                 info!(python = %python.display(), "Python bridge path configured");
             }
-            run_language_server(transport).await?;
+            run_language_server(transport, args.python).await?;
         }
     }
 
     Ok(())
 }
 
-async fn run_language_server(transport: Transport) -> Result<()> {
+async fn run_language_server(transport: Transport, python: Option<PathBuf>) -> Result<()> {
     info!(%transport, "Starting RobotCode language server");
 
-    let (service, socket) = LspService::new(RobotCodeServer::new);
+    let (service, socket) =
+        LspService::new(move |client| RobotCodeServer::with_python(client, python.clone()));
 
     match transport {
         Transport::Stdio => {

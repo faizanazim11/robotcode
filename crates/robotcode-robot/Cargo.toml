@@ -1,0 +1,20 @@
+[package]
+name = "robotcode-robot"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Robot Framework analysis engine for RobotCode"
+
+[dependencies]
+robotcode-python-bridge = { path = "../robotcode-python-bridge" }
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+dashmap.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
