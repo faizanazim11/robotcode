@@ -17,9 +17,10 @@ expression: file
       },
       "body": [
         {
-          "type": "Error",
-          "value": "Library    Collections",
-          "message": "Unexpected token Data",
+          "type": "LibraryImport",
+          "name": "Collections",
+          "args": [],
+          "alias": null,
           "position": {
             "line": 1,
             "column": 0,
@@ -28,9 +29,10 @@ expression: file
           }
         },
         {
-          "type": "Error",
-          "value": "Library    String    WITH NAME    Str",
-          "message": "Unexpected token Data",
+          "type": "LibraryImport",
+          "name": "String",
+          "args": [],
+          "alias": "Str",
           "position": {
             "line": 2,
             "column": 0,
@@ -39,9 +41,8 @@ expression: file
           }
         },
         {
-          "type": "Error",
-          "value": "Resource    helpers.robot",
-          "message": "Unexpected token Data",
+          "type": "ResourceImport",
+          "path": "helpers.robot",
           "position": {
             "line": 3,
             "column": 0,
@@ -50,9 +51,8 @@ expression: file
           }
         },
         {
-          "type": "Error",
-          "value": "Documentation    Suite documentation    continued on next line",
-          "message": "Unexpected token Data",
+          "type": "Documentation",
+          "value": "Suite documentation continued on next line",
           "position": {
             "line": 4,
             "column": 0,
@@ -61,9 +61,12 @@ expression: file
           }
         },
         {
-          "type": "Error",
-          "value": "Suite Setup    Log    starting",
-          "message": "Unexpected token Data",
+          "type": "SuiteSetup",
+          "kind": "SuiteSetup",
+          "name": "Log",
+          "args": [
+            "starting"
+          ],
           "position": {
             "line": 6,
             "column": 0,
@@ -72,9 +75,12 @@ expression: file
           }
         },
         {
-          "type": "Error",
-          "value": "Test Tags    smoke    regression",
-          "message": "Unexpected token Data",
+          "type": "TestTags",
+          "kind": "Test",
+          "tags": [
+            "smoke",
+            "regression"
+          ],
           "position": {
             "line": 7,
             "column": 0,

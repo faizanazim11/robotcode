@@ -26,22 +26,70 @@ pub fn unescape(text: &str) -> String {
 
         // We have a backslash with at least one following character.
         match chars[i + 1] {
-            'n' => { result.push('\n'); i += 2; }
-            't' => { result.push('\t'); i += 2; }
-            'r' => { result.push('\r'); i += 2; }
-            '\\' => { result.push('\\'); i += 2; }
-            '#' => { result.push('#'); i += 2; }
-            '$' => { result.push('$'); i += 2; }
-            '@' => { result.push('@'); i += 2; }
-            '&' => { result.push('&'); i += 2; }
-            '%' => { result.push('%'); i += 2; }
-            '=' => { result.push('='); i += 2; }
-            '|' => { result.push('|'); i += 2; }
-            'a' => { result.push('\x07'); i += 2; } // bell
-            'b' => { result.push('\x08'); i += 2; } // backspace
-            'f' => { result.push('\x0C'); i += 2; } // formfeed
-            'v' => { result.push('\x0B'); i += 2; } // vertical tab
-            '0' => { result.push('\0'); i += 2; }
+            'n' => {
+                result.push('\n');
+                i += 2;
+            }
+            't' => {
+                result.push('\t');
+                i += 2;
+            }
+            'r' => {
+                result.push('\r');
+                i += 2;
+            }
+            '\\' => {
+                result.push('\\');
+                i += 2;
+            }
+            '#' => {
+                result.push('#');
+                i += 2;
+            }
+            '$' => {
+                result.push('$');
+                i += 2;
+            }
+            '@' => {
+                result.push('@');
+                i += 2;
+            }
+            '&' => {
+                result.push('&');
+                i += 2;
+            }
+            '%' => {
+                result.push('%');
+                i += 2;
+            }
+            '=' => {
+                result.push('=');
+                i += 2;
+            }
+            '|' => {
+                result.push('|');
+                i += 2;
+            }
+            'a' => {
+                result.push('\x07');
+                i += 2;
+            } // bell
+            'b' => {
+                result.push('\x08');
+                i += 2;
+            } // backspace
+            'f' => {
+                result.push('\x0C');
+                i += 2;
+            } // formfeed
+            'v' => {
+                result.push('\x0B');
+                i += 2;
+            } // vertical tab
+            '0' => {
+                result.push('\0');
+                i += 2;
+            }
             'x' => {
                 // \xHH — exactly two hex digits.
                 if i + 3 < len {
@@ -110,15 +158,25 @@ pub fn split_from_equals(text: &str) -> Option<(String, String)> {
 
     while i < len {
         match chars[i] {
-            '\\' => { i += 2; } // skip escaped character
-            '{' => { depth += 1; i += 1; }
-            '}' => { depth = depth.saturating_sub(1); i += 1; }
+            '\\' => {
+                i += 2;
+            } // skip escaped character
+            '{' => {
+                depth += 1;
+                i += 1;
+            }
+            '}' => {
+                depth = depth.saturating_sub(1);
+                i += 1;
+            }
             '=' if depth == 0 => {
                 let key = chars[..i].iter().collect();
                 let value = chars[i + 1..].iter().collect();
                 return Some((key, value));
             }
-            _ => { i += 1; }
+            _ => {
+                i += 1;
+            }
         }
     }
     None
@@ -144,7 +202,10 @@ mod tests {
 
     #[test]
     fn test_split_from_equals() {
-        assert_eq!(split_from_equals("key=value"), Some(("key".into(), "value".into())));
+        assert_eq!(
+            split_from_equals("key=value"),
+            Some(("key".into(), "value".into()))
+        );
         assert_eq!(split_from_equals("no equals"), None);
         assert_eq!(split_from_equals("a=b=c"), Some(("a".into(), "b=c".into())));
     }
@@ -152,6 +213,9 @@ mod tests {
     #[test]
     fn test_split_from_equals_inside_variable() {
         // The `=` inside `${…}` should NOT be the split point.
-        assert_eq!(split_from_equals("${a=b}=value"), Some(("${a=b}".into(), "value".into())));
+        assert_eq!(
+            split_from_equals("${a=b}=value"),
+            Some(("${a=b}".into(), "value".into()))
+        );
     }
 }

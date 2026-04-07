@@ -4,9 +4,7 @@ pub mod ast;
 
 use ast::*;
 
-use crate::lexer::{
-    tokens::{Position, Token, TokenKind},
-};
+use crate::lexer::tokens::{Position, Token, TokenKind};
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -148,22 +146,26 @@ impl Parser {
 
     fn setting_item_from_stmt(&self, stmt: &[Token]) -> SettingItem {
         if stmt.is_empty() {
-            return SettingItem::EmptyLine(EmptyLine { position: Position::default() });
+            return SettingItem::EmptyLine(EmptyLine {
+                position: Position::default(),
+            });
         }
         let first = &stmt[0];
         match &first.kind {
-            TokenKind::EmptyLine => {
-                SettingItem::EmptyLine(EmptyLine { position: first.position.clone() })
-            }
+            TokenKind::EmptyLine => SettingItem::EmptyLine(EmptyLine {
+                position: first.position.clone(),
+            }),
             TokenKind::Comment => SettingItem::Comment(CommentLine {
                 value: first.value.clone(),
                 position: first.position.clone(),
             }),
             TokenKind::Library => {
-                let args_tokens = data_tokens(stmt, 1);
-                let (args, alias) = split_with_name(&args_tokens);
+                let all_args = data_tokens(stmt, 1);
+                let name = all_args.first().cloned().unwrap_or_default();
+                let rest = all_args.into_iter().skip(1).collect::<Vec<_>>();
+                let (args, alias) = split_with_name(&rest);
                 SettingItem::LibraryImport(LibraryImport {
-                    name: args_tokens.first().cloned().unwrap_or_default(),
+                    name,
                     args,
                     alias,
                     position: first.position.clone(),
@@ -191,13 +193,21 @@ impl Parser {
                 let args = data_tokens(stmt, 1);
                 let name = args.first().cloned().unwrap_or_default();
                 let value = args.into_iter().skip(1).collect::<Vec<_>>().join(" ");
-                SettingItem::Metadata(Metadata { name, value, position: first.position.clone() })
+                SettingItem::Metadata(Metadata {
+                    name,
+                    value,
+                    position: first.position.clone(),
+                })
             }
-            TokenKind::SuiteSetup => SettingItem::SuiteSetup(self.fixture(stmt, FixtureKind::SuiteSetup)),
+            TokenKind::SuiteSetup => {
+                SettingItem::SuiteSetup(self.fixture(stmt, FixtureKind::SuiteSetup))
+            }
             TokenKind::SuiteTeardown => {
                 SettingItem::SuiteTeardown(self.fixture(stmt, FixtureKind::SuiteTeardown))
             }
-            TokenKind::TestSetup => SettingItem::TestSetup(self.fixture(stmt, FixtureKind::TestSetup)),
+            TokenKind::TestSetup => {
+                SettingItem::TestSetup(self.fixture(stmt, FixtureKind::TestSetup))
+            }
             TokenKind::TestTeardown => {
                 SettingItem::TestTeardown(self.fixture(stmt, FixtureKind::TestTeardown))
             }
@@ -243,7 +253,12 @@ impl Parser {
         let args = data_tokens(stmt, 1);
         let name = args.first().cloned().unwrap_or_default();
         let rest = args.into_iter().skip(1).collect();
-        SuiteFixture { kind, name, args: rest, position: first.position.clone() }
+        SuiteFixture {
+            kind,
+            name,
+            args: rest,
+            position: first.position.clone(),
+        }
     }
 
     // ── Variables section ─────────────────────────────────────────────────
@@ -253,9 +268,9 @@ impl Parser {
         while !self.at_end() && !self.is_section_header() {
             let stmt = self.advance().unwrap().clone();
             let item = match stmt.first().map(|t| &t.kind) {
-                Some(TokenKind::EmptyLine) => {
-                    VariableItem::EmptyLine(EmptyLine { position: stmt[0].position.clone() })
-                }
+                Some(TokenKind::EmptyLine) => VariableItem::EmptyLine(EmptyLine {
+                    position: stmt[0].position.clone(),
+                }),
                 Some(TokenKind::Comment) => VariableItem::Comment(CommentLine {
                     value: stmt[0].value.clone(),
                     position: stmt[0].position.clone(),
@@ -297,9 +312,23 @@ impl Parser {
                 let name = name_stmt[0].value.clone();
                 let pos = name_stmt[0].position.clone();
                 let body_items = self.parse_body(&[TokenKind::TestCaseName]);
-                body.push(TestCase { name, position: pos, body: body_items });
+                body.push(TestCase {
+                    name,
+                    position: pos,
+                    body: body_items,
+                });
             } else {
-                self.advance(); // skip unexpected
+                // Unexpected statement — record it as an error in a synthetic test case.
+                let stmt = self.advance().unwrap().clone();
+                let error = BodyItem::Error(ErrorNode {
+                    value: stmt_text(&stmt),
+                    message: "Statement outside of test case definition".into(),
+                    position: stmt_position(&stmt),
+                });
+                // Attach to the last test case if one exists, otherwise create a nameless one.
+                if let Some(last) = body.last_mut() {
+                    last.body.push(error);
+                }
             }
         }
         TestCasesSection { header, body }
@@ -319,9 +348,21 @@ impl Parser {
                 let name = name_stmt[0].value.clone();
                 let pos = name_stmt[0].position.clone();
                 let body_items = self.parse_body(&[TokenKind::TaskName]);
-                body.push(Task { name, position: pos, body: body_items });
+                body.push(Task {
+                    name,
+                    position: pos,
+                    body: body_items,
+                });
             } else {
-                self.advance();
+                let stmt = self.advance().unwrap().clone();
+                let error = BodyItem::Error(ErrorNode {
+                    value: stmt_text(&stmt),
+                    message: "Statement outside of task definition".into(),
+                    position: stmt_position(&stmt),
+                });
+                if let Some(last) = body.last_mut() {
+                    last.body.push(error);
+                }
             }
         }
         TasksSection { header, body }
@@ -341,9 +382,21 @@ impl Parser {
                 let name = name_stmt[0].value.clone();
                 let pos = name_stmt[0].position.clone();
                 let body_items = self.parse_body(&[TokenKind::KeywordName]);
-                body.push(Keyword { name, position: pos, body: body_items });
+                body.push(Keyword {
+                    name,
+                    position: pos,
+                    body: body_items,
+                });
             } else {
-                self.advance();
+                let stmt = self.advance().unwrap().clone();
+                let error = BodyItem::Error(ErrorNode {
+                    value: stmt_text(&stmt),
+                    message: "Statement outside of keyword definition".into(),
+                    position: stmt_position(&stmt),
+                });
+                if let Some(last) = body.last_mut() {
+                    last.body.push(error);
+                }
             }
         }
         KeywordsSection { header, body }
@@ -356,7 +409,10 @@ impl Parser {
         while !self.at_end() && !self.is_section_header() {
             let stmt = self.advance().unwrap().clone();
             if let Some(t) = stmt.first() {
-                body.push(CommentLine { value: t.value.clone(), position: t.position.clone() });
+                body.push(CommentLine {
+                    value: t.value.clone(),
+                    position: t.position.clone(),
+                });
             }
         }
         CommentsSection { header, body }
@@ -385,11 +441,17 @@ impl Parser {
     fn body_item_from_stmt(&mut self, stmt: Vec<Token>, stop_at: &[TokenKind]) -> BodyItem {
         let first = match stmt.first() {
             Some(t) => t,
-            None => return BodyItem::EmptyLine(EmptyLine { position: Position::default() }),
+            None => {
+                return BodyItem::EmptyLine(EmptyLine {
+                    position: Position::default(),
+                })
+            }
         };
 
         match &first.kind {
-            TokenKind::EmptyLine => BodyItem::EmptyLine(EmptyLine { position: first.position.clone() }),
+            TokenKind::EmptyLine => BodyItem::EmptyLine(EmptyLine {
+                position: first.position.clone(),
+            }),
             TokenKind::Comment => BodyItem::Comment(CommentLine {
                 value: first.value.clone(),
                 position: first.position.clone(),
@@ -449,12 +511,12 @@ impl Parser {
             TokenKind::While => BodyItem::While(self.parse_while(&stmt, stop_at)),
             TokenKind::If => BodyItem::If(self.parse_if(&stmt, stop_at)),
             TokenKind::Try => BodyItem::Try(self.parse_try(&stmt, stop_at)),
-            TokenKind::Break => {
-                BodyItem::Break(BreakStmt { position: first.position.clone() })
-            }
-            TokenKind::Continue => {
-                BodyItem::Continue(ContinueStmt { position: first.position.clone() })
-            }
+            TokenKind::Break => BodyItem::Break(BreakStmt {
+                position: first.position.clone(),
+            }),
+            TokenKind::Continue => BodyItem::Continue(ContinueStmt {
+                position: first.position.clone(),
+            }),
             TokenKind::ReturnStatement => BodyItem::Return(ReturnStmt {
                 values: data_tokens(&stmt, 1),
                 position: first.position.clone(),
@@ -535,7 +597,12 @@ impl Parser {
             })
             .collect();
         let body = self.parse_block_body();
-        WhileLoop { condition, options, body, position: pos }
+        WhileLoop {
+            condition,
+            options,
+            body,
+            position: pos,
+        }
     }
 
     // ── IF block ──────────────────────────────────────────────────────────
@@ -548,7 +615,12 @@ impl Parser {
 
         // Collect IF body until ELSE IF / ELSE / END.
         let body = self.parse_until_else_or_end(stop_at);
-        branches.push(IfBranch { kind: IfKind::If, condition, body, position: branch_pos });
+        branches.push(IfBranch {
+            kind: IfKind::If,
+            condition,
+            body,
+            position: branch_pos,
+        });
 
         // ELSE IF / ELSE branches.
         loop {
@@ -558,13 +630,23 @@ impl Parser {
                     let cond = data_tokens(&s, 1).into_iter().next();
                     let bpos = s[0].position.clone();
                     let body = self.parse_until_else_or_end(stop_at);
-                    branches.push(IfBranch { kind: IfKind::ElseIf, condition: cond, body, position: bpos });
+                    branches.push(IfBranch {
+                        kind: IfKind::ElseIf,
+                        condition: cond,
+                        body,
+                        position: bpos,
+                    });
                 }
                 Some(TokenKind::Else) => {
                     let s = self.advance().unwrap().clone();
                     let bpos = s[0].position.clone();
                     let body = self.parse_block_body();
-                    branches.push(IfBranch { kind: IfKind::Else, condition: None, body, position: bpos });
+                    branches.push(IfBranch {
+                        kind: IfKind::Else,
+                        condition: None,
+                        body,
+                        position: bpos,
+                    });
                     break;
                 }
                 Some(TokenKind::End) => {
@@ -575,7 +657,10 @@ impl Parser {
             }
         }
 
-        IfBlock { branches, position: pos }
+        IfBlock {
+            branches,
+            position: pos,
+        }
     }
 
     fn parse_until_else_or_end(&mut self, stop_at: &[TokenKind]) -> Vec<BodyItem> {
@@ -621,19 +706,40 @@ impl Parser {
                     let args = data_tokens(&s, 1);
                     let (patterns, pattern_type, var) = parse_except_args(args);
                     let body = self.parse_until_except_or_end(stop_at);
-                    branches.push(TryBranch { kind: TryKind::Except, patterns, pattern_type, var, body, position: bpos2 });
+                    branches.push(TryBranch {
+                        kind: TryKind::Except,
+                        patterns,
+                        pattern_type,
+                        var,
+                        body,
+                        position: bpos2,
+                    });
                 }
                 Some(TokenKind::Else) => {
                     let s = self.advance().unwrap().clone();
                     let bpos2 = s[0].position.clone();
                     let body = self.parse_until_except_or_end(stop_at);
-                    branches.push(TryBranch { kind: TryKind::Else, patterns: vec![], pattern_type: None, var: None, body, position: bpos2 });
+                    branches.push(TryBranch {
+                        kind: TryKind::Else,
+                        patterns: vec![],
+                        pattern_type: None,
+                        var: None,
+                        body,
+                        position: bpos2,
+                    });
                 }
                 Some(TokenKind::Finally) => {
                     let s = self.advance().unwrap().clone();
                     let bpos2 = s[0].position.clone();
                     let body = self.parse_block_body();
-                    branches.push(TryBranch { kind: TryKind::Finally, patterns: vec![], pattern_type: None, var: None, body, position: bpos2 });
+                    branches.push(TryBranch {
+                        kind: TryKind::Finally,
+                        patterns: vec![],
+                        pattern_type: None,
+                        var: None,
+                        body,
+                        position: bpos2,
+                    });
                     break;
                 }
                 Some(TokenKind::End) => {
@@ -644,7 +750,10 @@ impl Parser {
             }
         }
 
-        TryBlock { branches, position: pos }
+        TryBlock {
+            branches,
+            position: pos,
+        }
     }
 
     fn parse_until_except_or_end(&mut self, stop_at: &[TokenKind]) -> Vec<BodyItem> {
@@ -654,7 +763,9 @@ impl Parser {
                 break;
             }
             match self.first_kind() {
-                Some(TokenKind::Except | TokenKind::Else | TokenKind::Finally | TokenKind::End) => break,
+                Some(TokenKind::Except | TokenKind::Else | TokenKind::Finally | TokenKind::End) => {
+                    break
+                }
                 Some(k) if stop_at.contains(k) => break,
                 _ => {
                     let stmt = self.advance().unwrap().clone();
@@ -716,7 +827,10 @@ fn split_with_name(args: &[String]) -> (Vec<String>, Option<String>) {
 fn split_for_args(args: &[String]) -> (Vec<String>, String, Vec<String>) {
     let separator_idx = args.iter().position(|a| {
         let upper = a.to_ascii_uppercase();
-        matches!(upper.as_str(), "IN" | "IN RANGE" | "IN ENUMERATE" | "IN ZIP")
+        matches!(
+            upper.as_str(),
+            "IN" | "IN RANGE" | "IN ENUMERATE" | "IN ZIP"
+        )
     });
 
     if let Some(idx) = separator_idx {
@@ -765,6 +879,9 @@ fn stmt_position(stmt: &[Token]) -> Position {
 
 fn is_empty_or_comment_stmt(stmt: &[Token]) -> bool {
     stmt.iter().all(|t| {
-        matches!(t.kind, TokenKind::EmptyLine | TokenKind::Comment | TokenKind::Eol | TokenKind::Eos)
+        matches!(
+            t.kind,
+            TokenKind::EmptyLine | TokenKind::Comment | TokenKind::Eol | TokenKind::Eos
+        )
     })
 }

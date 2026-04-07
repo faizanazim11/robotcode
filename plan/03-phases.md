@@ -346,17 +346,17 @@ The Rust AST does not need to be a 1:1 mirror of Robot Framework's Python AST �
 
 ## Phase Summary Table
 
-| Phase | Name | Duration | Key Output |
-|-------|------|----------|------------|
+| Phase | Name | Duration | Key Output | Status |
+|-------|------|----------|------------|--------|
 | 1 | Foundation | 4–6 weeks | Cargo workspace, core crate | ✅ Complete |
 | 2 | RF Parser | 8–10 weeks | Rust `.robot` parser | ✅ Complete |
-| 3 | LSP Transport | 3–4 weeks | `tower-lsp` stub connected to VS Code |
-| 4 | Python Bridge | 4–5 weeks | Library introspection working |
-| 5 | Diagnostics Engine | 8–10 weeks | Diagnostics parity with Python |
-| 6 | LSP Features | 10–12 weeks | Full feature parity |
-| 7 | DAP & CLI | 6–8 weeks | Debugger + CLI tools |
-| 8 | REPL & Cutover | 4–6 weeks | Shipped Rust binary, Python deprecated |
-| **Total** | | **~18–24 months** | |
+| 3 | LSP Transport | 3–4 weeks | `tower-lsp` stub connected to VS Code | |
+| 4 | Python Bridge | 4–5 weeks | Library introspection working | |
+| 5 | Diagnostics Engine | 8–10 weeks | Diagnostics parity with Python | |
+| 6 | LSP Features | 10–12 weeks | Full feature parity | |
+| 7 | DAP & CLI | 6–8 weeks | Debugger + CLI tools | |
+| 8 | REPL & Cutover | 4–6 weeks | Shipped Rust binary, Python deprecated | |
+| **Total** | | **~18–24 months** | | |
 
 ---
 
@@ -364,7 +364,9 @@ The Rust AST does not need to be a 1:1 mirror of Robot Framework's Python AST �
 
 ### M1 (after Phase 2): Parser Validation ✅
 - Rust parser handles all test fixtures without panic ✅
-- 5 snapshot tests cover all major RF constructs ✅
+- 5 snapshot tests cover all major RF constructs (simple, variables, settings, keywords, control flow) ✅
+- Settings and Variables sections produce structured AST nodes (no Error nodes) ✅
+- `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test` all pass ✅
 
 ### M2 (after Phase 4): Language Server Alpha
 - VS Code can connect to Rust LS

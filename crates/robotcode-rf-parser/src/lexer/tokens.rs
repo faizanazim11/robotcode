@@ -111,6 +111,10 @@ pub struct Token {
 
 impl Token {
     pub fn new(kind: TokenKind, value: impl Into<String>, position: Position) -> Self {
-        Self { kind, value: value.into(), position }
+        Self {
+            kind,
+            value: value.into(),
+            position,
+        }
     }
 }

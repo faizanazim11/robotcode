@@ -9,7 +9,6 @@ description = "Robot Framework lexer and parser for RobotCode"
 [dependencies]
 serde = { workspace = true }
 thiserror = { workspace = true }
-logos = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }

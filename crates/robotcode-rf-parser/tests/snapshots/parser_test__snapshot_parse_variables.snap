@@ -17,9 +17,11 @@ expression: file
       },
       "body": [
         {
-          "type": "Error",
-          "value": "${SCALAR}    hello",
-          "message": "Unexpected token in Variables section",
+          "type": "Variable",
+          "name": "${SCALAR}",
+          "value": [
+            "hello"
+          ],
           "position": {
             "line": 1,
             "column": 0,
@@ -28,9 +30,13 @@ expression: file
           }
         },
         {
-          "type": "Error",
-          "value": "@{LIST}    a    b    c",
-          "message": "Unexpected token in Variables section",
+          "type": "Variable",
+          "name": "@{LIST}",
+          "value": [
+            "a",
+            "b",
+            "c"
+          ],
           "position": {
             "line": 2,
             "column": 0,
@@ -39,9 +45,12 @@ expression: file
           }
         },
         {
-          "type": "Error",
-          "value": "&{DICT}    key=value    other=stuff",
-          "message": "Unexpected token in Variables section",
+          "type": "Variable",
+          "name": "&{DICT}",
+          "value": [
+            "key=value",
+            "other=stuff"
+          ],
           "position": {
             "line": 3,
             "column": 0,

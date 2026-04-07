@@ -44,7 +44,10 @@ struct Lexer<'s> {
 
 impl<'s> Lexer<'s> {
     fn new(source: &'s str) -> Self {
-        Self { source, section: SectionKind::None }
+        Self {
+            source,
+            section: SectionKind::None,
+        }
     }
 
     fn tokenize(mut self) -> Vec<Vec<Token>> {
@@ -88,7 +91,11 @@ impl<'s> Lexer<'s> {
                     statements.push(std::mem::take(&mut current_stmt));
                 }
                 self.section = section_kind_from_header(&kind);
-                let tok = Token::new(kind, line.trim(), pos(line_no, 0, line_no, line.len() as u32));
+                let tok = Token::new(
+                    kind,
+                    line.trim(),
+                    pos(line_no, 0, line_no, line.len() as u32),
+                );
                 statements.push(vec![tok, eol_token(line_no, line.len() as u32)]);
                 continue;
             }
@@ -243,7 +250,9 @@ fn detect_section_header(line: &str) -> Option<TokenKind> {
         return None;
     }
     // Strip leading and trailing `*` characters and spaces.
-    let inner = t.trim_matches(|c| c == '*' || c == ' ').to_ascii_lowercase();
+    let inner = t
+        .trim_matches(|c| c == '*' || c == ' ')
+        .to_ascii_lowercase();
     let inner = inner.trim();
     match inner {
         "settings" | "setting" => Some(TokenKind::SettingHeader),
@@ -282,14 +291,11 @@ fn cell_to_token(
     let p = pos(line, col, line, end_col);
     let v = cell.to_string();
 
-    // Block name (test/keyword name — non-indented line in TestCases/Keywords section).
-    if is_block_name {
-        let kind = match section {
-            SectionKind::TestCases => TokenKind::TestCaseName,
-            SectionKind::Tasks => TokenKind::TaskName,
-            SectionKind::Keywords => TokenKind::KeywordName,
-            _ => TokenKind::Data,
-        };
+    // Settings section — first cell of statement is the setting keyword.
+    // This must be checked before the generic is_block_name path so that rows
+    // like `Library    Collections` are not mistakenly tokenized as Data.
+    if *section == SectionKind::Settings && stmt_so_far.is_empty() {
+        let kind = match_setting_keyword(&v);
         return Token::new(kind, v, p);
     }
 
@@ -298,9 +304,15 @@ fn cell_to_token(
         return Token::new(TokenKind::Variable, v, p);
     }
 
-    // Settings section — first cell of statement is the setting keyword.
-    if *section == SectionKind::Settings && stmt_so_far.is_empty() {
-        let kind = match_setting_keyword(&v);
+    // Block name (test/keyword/task name — non-indented first cell in the
+    // TestCases, Tasks, or Keywords sections only).
+    if is_block_name {
+        let kind = match section {
+            SectionKind::TestCases => TokenKind::TestCaseName,
+            SectionKind::Tasks => TokenKind::TaskName,
+            SectionKind::Keywords => TokenKind::KeywordName,
+            _ => TokenKind::Data,
+        };
         return Token::new(kind, v, p);
     }
 
@@ -337,7 +349,7 @@ fn is_first_body_token(stmt_so_far: &[Token]) -> bool {
 }
 
 fn match_setting_keyword(s: &str) -> TokenKind {
-    match s.to_ascii_lowercase().trim_end_matches(|c: char| c == ':') {
+    match s.to_ascii_lowercase().trim_end_matches(':') {
         "library" => TokenKind::Library,
         "resource" => TokenKind::Resource,
         "variables" => TokenKind::Variables,
@@ -393,14 +405,18 @@ fn match_control_flow(s: &str) -> Option<TokenKind> {
 
 fn is_assignment_token(s: &str) -> bool {
     let s = s.trim_end_matches('=').trim_end();
-    (s.starts_with("${") || s.starts_with("@{") || s.starts_with("&{"))
-        && s.ends_with('}')
+    (s.starts_with("${") || s.starts_with("@{") || s.starts_with("&{")) && s.ends_with('}')
 }
 
 // ── Position helpers ──────────────────────────────────────────────────────────
 
 fn pos(line: u32, col: u32, end_line: u32, end_col: u32) -> Position {
-    Position { line, column: col, end_line, end_column: end_col }
+    Position {
+        line,
+        column: col,
+        end_line,
+        end_column: end_col,
+    }
 }
 
 fn eol_token(line: u32, col: u32) -> Token {
