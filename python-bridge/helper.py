@@ -26,13 +26,20 @@ from typing import Any
 
 def _rf_version(_params: dict) -> dict:
     """Return the installed Robot Framework version."""
+    import re
     import robot.version as _v  # type: ignore[import]
 
     ver: str = _v.VERSION
     parts = ver.split(".")
-    major = int(parts[0]) if len(parts) > 0 else 0
-    minor = int(parts[1]) if len(parts) > 1 else 0
-    patch = int(parts[2]) if len(parts) > 2 else 0
+
+    def _parse_int(s: str) -> int:
+        # Extract leading digits only — handles pre-releases like "7.0rc1".
+        m = re.match(r"\d+", s)
+        return int(m.group()) if m else 0
+
+    major = _parse_int(parts[0]) if len(parts) > 0 else 0
+    minor = _parse_int(parts[1]) if len(parts) > 1 else 0
+    patch = _parse_int(parts[2]) if len(parts) > 2 else 0
     return {"version": ver, "major": major, "minor": minor, "patch": patch}
 
 
@@ -89,7 +96,11 @@ def _variables_doc(params: dict) -> dict:
 
     path: str = params["path"]
     args: list = params.get("args", [])
-    base_dir: str = params.get("base_dir", os.path.dirname(path))
+    base_dir: str = params.get("base_dir", os.path.dirname(os.path.abspath(path)))
+
+    # Resolve relative path against base_dir.
+    if not os.path.isabs(path):
+        path = os.path.join(base_dir, path)
 
     try:
         from robot.variables.filesetter import VariableFileSetter  # type: ignore[import]
@@ -132,6 +143,13 @@ def _variables_doc(params: dict) -> dict:
 
 
 def _safe_repr(value: Any) -> str:
+    """Return a string representation of a value.
+
+    Plain strings are returned as-is.  Other types are JSON-encoded when
+    possible, falling back to ``repr()``.
+    """
+    if isinstance(value, str):
+        return value
     try:
         return json.dumps(value)
     except (TypeError, ValueError):
@@ -148,14 +166,19 @@ def _library_doc(params: dict) -> dict:
     python_path: list = params.get("python_path", [])
     variables: dict = params.get("variables", {})
 
-    # Extend sys.path temporarily
+    # Extend sys.path temporarily, preserving caller-provided order.
     import sys as _sys
 
     original_path = _sys.path[:]
+    original_dir = os.getcwd()
     try:
-        for p in python_path:
+        for p in reversed(python_path):
             if p not in _sys.path:
                 _sys.path.insert(0, p)
+
+        # Switch to base_dir so that relative library paths resolve correctly.
+        if base_dir and os.path.isdir(base_dir):
+            os.chdir(base_dir)
 
         from robot.libdocpkg import LibraryDocumentation  # type: ignore[import]
 
@@ -206,6 +229,7 @@ def _library_doc(params: dict) -> dict:
         }
     finally:
         _sys.path = original_path
+        os.chdir(original_dir)
 
 
 def _serialize_arg(arg: Any) -> dict:
@@ -232,8 +256,6 @@ def _arg_default(arg: Any) -> Any:
 
 def _discover(params: dict) -> dict:
     """Discover tests using Robot Framework's TestSuiteBuilder."""
-    import os
-
     paths: list = params.get("paths", [])
     include_tags: list = params.get("include_tags", [])
     exclude_tags: list = params.get("exclude_tags", [])
@@ -243,7 +265,7 @@ def _discover(params: dict) -> dict:
 
     original_path = _sys.path[:]
     try:
-        for p in python_path:
+        for p in reversed(python_path):
             if p not in _sys.path:
                 _sys.path.insert(0, p)
 
@@ -255,6 +277,18 @@ def _discover(params: dict) -> dict:
         for path in paths:
             try:
                 suite = builder.build(path)
+                # Apply tag filtering when requested.
+                if include_tags or exclude_tags:
+                    try:
+                        suite.filter(
+                            included_tags=include_tags or None,
+                            excluded_tags=exclude_tags or None,
+                        )
+                    except Exception as exc:
+                        print(
+                            f"[bridge] discover filter warning for {path!r}: {exc}",
+                            file=sys.stderr,
+                        )
                 suites_out.append(_serialize_suite(suite))
             except Exception as exc:
                 print(f"[bridge] discover warning for {path!r}: {exc}", file=sys.stderr)

@@ -1,13 +1,15 @@
 //! Library documentation fetching and caching.
 //!
 //! [`LibraryCache`] wraps a [`Bridge`] implementation and caches
-//! [`LibraryDoc`] structs keyed by [`LibraryCacheKey`].  The cache is
-//! concurrency-safe and suitable for use from multiple async tasks.
+//! [`robotcode_python_bridge::LibraryDoc`] structs keyed by
+//! [`LibraryCacheKey`].  The cache is concurrency-safe and suitable for use
+//! from multiple async tasks.
 
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use dashmap::DashMap;
+use tokio::sync::Mutex;
 use tracing::{debug, info};
 
 use robotcode_python_bridge::{Bridge, LibraryDoc, LibraryDocParams};
@@ -69,13 +71,21 @@ impl LibraryCacheKey {
 // LibraryCache
 // ---------------------------------------------------------------------------
 
+/// Per-key fetch slot: `None` means not yet fetched; `Some` is the cached doc.
+type Slot = Arc<Mutex<Option<Arc<LibraryDoc>>>>;
+
 /// Thread-safe cache for [`LibraryDoc`] objects.
 ///
 /// Wraps a [`Bridge`] and caches results so that repeated introspection of the
-/// same library incurs only a single Python bridge round-trip.
+/// same library incurs only a single Python bridge round-trip.  Concurrent
+/// requests for the same key are deduplicated: only one bridge call will be
+/// in flight at a time per key.
 pub struct LibraryCache {
     bridge: Arc<dyn Bridge>,
-    cache: DashMap<LibraryCacheKey, Arc<LibraryDoc>>,
+    /// Maps each key to a per-key [`Mutex`].  The first caller that misses the
+    /// cache acquires the slot mutex and populates it; subsequent concurrent
+    /// callers for the same key wait on the same mutex and read the result.
+    slots: DashMap<LibraryCacheKey, Slot>,
 }
 
 impl LibraryCache {
@@ -83,12 +93,15 @@ impl LibraryCache {
     pub fn new(bridge: Arc<dyn Bridge>) -> Self {
         Self {
             bridge,
-            cache: DashMap::new(),
+            slots: DashMap::new(),
         }
     }
 
     /// Fetch the library documentation for `key`, using the cache when
     /// possible.
+    ///
+    /// Concurrent callers with the same `key` are serialized per-key so that
+    /// only one bridge round-trip is ever in flight for a given library.
     ///
     /// * `base_dir` — optional working directory used when resolving relative
     ///   library paths (e.g. the directory containing the `.robot` file that
@@ -98,38 +111,49 @@ impl LibraryCache {
         key: &LibraryCacheKey,
         base_dir: Option<&str>,
     ) -> Result<Arc<LibraryDoc>, robotcode_python_bridge::BridgeError> {
-        if let Some(cached) = self.cache.get(key) {
+        // Get or create the per-key slot.  `entry().or_insert_with()` holds
+        // the DashMap shard lock only briefly; once we have the Arc we release
+        // it before any async work.
+        let slot: Slot = self
+            .slots
+            .entry(key.clone())
+            .or_insert_with(|| Arc::new(Mutex::new(None)))
+            .clone();
+
+        // Lock the slot.  This ensures only one fetch per key at a time.
+        let mut guard = slot.lock().await;
+
+        if let Some(doc) = guard.as_ref() {
             debug!(library = %key.name, "Library cache hit");
-            return Ok(Arc::clone(cached.value()));
+            return Ok(Arc::clone(doc));
         }
 
         info!(library = %key.name, "Library cache miss — fetching via bridge");
         let params = key.to_params(base_dir);
-        let doc = self.bridge.library_doc(params).await?;
-        let doc = Arc::new(doc);
-        self.cache.insert(key.clone(), Arc::clone(&doc));
+        let doc = Arc::new(self.bridge.library_doc(params).await?);
+        *guard = Some(Arc::clone(&doc));
         Ok(doc)
     }
 
     /// Remove a cached entry (e.g. after the library source file changed).
     pub fn invalidate(&self, key: &LibraryCacheKey) {
-        self.cache.remove(key);
+        self.slots.remove(key);
     }
 
     /// Remove all cached entries.
     pub fn clear(&self) {
-        self.cache.clear();
+        self.slots.clear();
     }
 
     /// Number of entries currently in the cache.
     #[must_use]
     pub fn len(&self) -> usize {
-        self.cache.len()
+        self.slots.len()
     }
 
     /// Returns `true` if the cache is empty.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.cache.is_empty()
+        self.slots.is_empty()
     }
 }

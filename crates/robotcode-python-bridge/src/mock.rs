@@ -7,9 +7,9 @@
 
 use std::collections::HashMap;
 use std::pin::Pin;
-use std::sync::Mutex;
 
 use serde_json::Value;
+use tokio::sync::Mutex;
 
 use crate::{Bridge, BridgeError, Result};
 
@@ -68,10 +68,7 @@ impl Bridge for MockBridge {
     ) -> Pin<Box<dyn std::future::Future<Output = Result<Value>> + Send + 'a>> {
         let method = method.to_owned();
         Box::pin(async move {
-            let mut map = self
-                .responses
-                .lock()
-                .map_err(|e| BridgeError::Internal(e.to_string()))?;
+            let mut map = self.responses.lock().await;
             let queue = map.get_mut(&method).ok_or_else(|| {
                 BridgeError::Internal(format!("MockBridge: no response registered for {method:?}"))
             })?;

@@ -34,8 +34,8 @@ fn python_exists(name: &str) -> bool {
 
 /// Path to `python-bridge/helper.py` relative to the workspace root.
 fn helper_path() -> PathBuf {
-    // This file is at crates/robotcode-python-bridge/tests/bridge_test.rs
-    // → go up 4 levels to reach workspace root.
+    // `CARGO_MANIFEST_DIR` is `crates/robotcode-python-bridge`
+    // → go up 2 levels to reach the workspace root.
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     manifest.join("../../python-bridge/helper.py")
 }
@@ -138,7 +138,7 @@ async fn mock_bridge_queue_exhausted_returns_error() {
 // SubprocessBridge integration tests (require Python + robotframework)
 // ---------------------------------------------------------------------------
 
-/// Macro that skips the test if Python is not available.
+/// Macro that skips the test if Python or robotframework is not available.
 macro_rules! require_python {
     ($python:ident, $helper:ident) => {
         let python_path = match find_python() {
@@ -153,6 +153,21 @@ macro_rules! require_python {
             eprintln!(
                 "Skipping test: helper.py not found at {}",
                 $helper.display()
+            );
+            return;
+        }
+        // Verify that `robotframework` is importable in this interpreter.
+        let rf_available = std::process::Command::new(&python_path)
+            .args(["-c", "import robot"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+        if !rf_available {
+            eprintln!(
+                "Skipping test: robotframework not importable in {:?}",
+                python_path
             );
             return;
         }

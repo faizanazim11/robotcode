@@ -72,7 +72,10 @@ pub trait Bridge: Send + Sync {
         &self,
         params: LibraryDocParams,
     ) -> Pin<Box<dyn Future<Output = Result<LibraryDoc>> + Send + '_>> {
-        let json_params = serde_json::to_value(params).unwrap_or_default();
+        let json_params = match serde_json::to_value(params) {
+            Ok(v) => v,
+            Err(e) => return Box::pin(std::future::ready(Err(e.into()))),
+        };
         let fut = self.call("library_doc", json_params);
         Box::pin(async move {
             let val = fut.await?;
@@ -85,7 +88,10 @@ pub trait Bridge: Send + Sync {
         &self,
         params: VariablesDocParams,
     ) -> Pin<Box<dyn Future<Output = Result<VariablesDoc>> + Send + '_>> {
-        let json_params = serde_json::to_value(params).unwrap_or_default();
+        let json_params = match serde_json::to_value(params) {
+            Ok(v) => v,
+            Err(e) => return Box::pin(std::future::ready(Err(e.into()))),
+        };
         let fut = self.call("variables_doc", json_params);
         Box::pin(async move {
             let val = fut.await?;
@@ -111,7 +117,10 @@ pub trait Bridge: Send + Sync {
         &self,
         params: DiscoverParams,
     ) -> Pin<Box<dyn Future<Output = Result<DiscoverResult>> + Send + '_>> {
-        let json_params = serde_json::to_value(params).unwrap_or_default();
+        let json_params = match serde_json::to_value(params) {
+            Ok(v) => v,
+            Err(e) => return Box::pin(std::future::ready(Err(e.into()))),
+        };
         let fut = self.call("discover", json_params);
         Box::pin(async move {
             let val = fut.await?;
