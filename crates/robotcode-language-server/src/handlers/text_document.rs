@@ -14,10 +14,7 @@ pub async fn did_open(client: &Client, params: DidOpenTextDocumentParams) {
         "Document opened"
     );
     client
-        .log_message(
-            MessageType::LOG,
-            format!("Opened: {}", doc.uri),
-        )
+        .log_message(MessageType::LOG, format!("Opened: {}", doc.uri))
         .await;
 }
 
