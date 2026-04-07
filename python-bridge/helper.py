@@ -19,14 +19,15 @@ import sys
 import traceback
 from typing import Any
 
-
 # ---------------------------------------------------------------------------
 # Method implementations
 # ---------------------------------------------------------------------------
 
+
 def _rf_version(_params: dict) -> dict:
     """Return the installed Robot Framework version."""
     import re
+
     import robot.version as _v  # type: ignore[import]
 
     ver: str = _v.VERSION
@@ -161,10 +162,11 @@ def _library_doc(params: dict) -> dict:
     import os
 
     name: str = params["name"]
-    args: list = params.get("args", [])
+    args: list[str] = params.get("args", [])
     base_dir: str = params.get("base_dir", os.getcwd())
-    python_path: list = params.get("python_path", [])
-    variables: dict = params.get("variables", {})
+    python_path: list[str] = params.get("python_path", [])
+    # `variables` is accepted for API consistency but not yet applied.
+    params.get("variables", {})
 
     # Extend sys.path temporarily, preserving caller-provided order.
     import sys as _sys
@@ -182,8 +184,10 @@ def _library_doc(params: dict) -> dict:
 
         from robot.libdocpkg import LibraryDocumentation  # type: ignore[import]
 
+        # Pass constructor args using the RF `::` separator convention.
+        lib_spec = name if not args else "::".join([name, *args])
         doc = LibraryDocumentation(
-            name,
+            lib_spec,
             doc_format="ROBOT",
         )
 
@@ -208,7 +212,7 @@ def _library_doc(params: dict) -> dict:
             )
 
         inits = []
-        for init in (doc.inits or []):
+        for init in doc.inits or []:
             init_args = []
             try:
                 for arg in init.args:
@@ -338,6 +342,7 @@ _METHODS = {
 # ---------------------------------------------------------------------------
 # Main request/response loop
 # ---------------------------------------------------------------------------
+
 
 def _json_default(obj: Any) -> Any:
     """Custom JSON serializer for types not handled by the default encoder."""

@@ -257,6 +257,7 @@ exclude = [
   "^scripts/",
   "^bundled/libs/",
   "^intellij-client/",
+  "^python-bridge/",
 ]
 mypy_path = [
   "typings",
