@@ -15,24 +15,21 @@ use serde_json::json;
 /// Locate `python3` on PATH; skip if not found.
 fn find_python() -> Option<PathBuf> {
     for name in &["python3", "python"] {
-        if let Ok(path) = which_python(name) {
-            return Some(path);
+        if python_exists(name) {
+            return Some(PathBuf::from(name));
         }
     }
     None
 }
 
-fn which_python(name: &str) -> Result<PathBuf, ()> {
-    let output = std::process::Command::new("which")
-        .arg(name)
-        .output()
-        .map_err(|_| ())?;
-    if output.status.success() {
-        let s = String::from_utf8(output.stdout).map_err(|_| ())?;
-        Ok(PathBuf::from(s.trim()))
-    } else {
-        Err(())
-    }
+fn python_exists(name: &str) -> bool {
+    std::process::Command::new(name)
+        .arg("--version")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
 }
 
 /// Path to `python-bridge/helper.py` relative to the workspace root.

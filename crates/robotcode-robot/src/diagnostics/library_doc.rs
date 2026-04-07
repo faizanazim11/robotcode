@@ -122,11 +122,13 @@ impl LibraryCache {
     }
 
     /// Number of entries currently in the cache.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.cache.len()
     }
 
     /// Returns `true` if the cache is empty.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.cache.is_empty()
     }

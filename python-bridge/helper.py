@@ -213,14 +213,21 @@ def _serialize_arg(arg: Any) -> dict:
     name = getattr(arg, "name", str(arg))
     kind_raw = getattr(arg, "kind", None)
     kind = str(kind_raw) if kind_raw is not None else "POSITIONAL_OR_NAMED"
-    default_raw = getattr(arg, "default", None)
-    default_repr = getattr(arg, "default_repr", None)
-    default_val = default_repr if default_repr is not None else (
-        _safe_repr(default_raw) if default_raw is not None else None
-    )
+    default_val = _arg_default(arg)
     types_raw = getattr(arg, "types", None) or []
     types = [str(t) for t in types_raw]
     return {"name": name, "kind": kind, "default": default_val, "types": types}
+
+
+def _arg_default(arg: Any) -> Any:
+    """Return the default value string for an argument, or None if there is none."""
+    default_repr = getattr(arg, "default_repr", None)
+    if default_repr is not None:
+        return default_repr
+    default_raw = getattr(arg, "default", None)
+    if default_raw is not None:
+        return _safe_repr(default_raw)
+    return None
 
 
 def _discover(params: dict) -> dict:
