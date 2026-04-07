@@ -1,7 +1,7 @@
 //! Handlers for `textDocument/*` LSP notifications.
 
-use tower_lsp::lsp_types::*;
-use tower_lsp::Client;
+use robotcode_jsonrpc2::lsp_types::*;
+use robotcode_jsonrpc2::Client;
 use tracing::{debug, info};
 
 /// Handle `textDocument/didOpen`.

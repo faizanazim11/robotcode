@@ -5,9 +5,8 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use robotcode_jsonrpc2::Transport;
+use robotcode_jsonrpc2::{LspService, Server, Transport};
 use robotcode_language_server::RobotCodeServer;
-use tower_lsp::{LspService, Server};
 use tracing::info;
 
 /// RobotCode — Robot Framework IDE toolkit.

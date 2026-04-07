@@ -4,6 +4,7 @@
 //! depend on this crate and not directly on `tower-lsp`.
 
 // Re-export tower-lsp types so consumers can use them without a direct dependency.
+pub use tower_lsp::async_trait;
 pub use tower_lsp::jsonrpc::{Error, ErrorCode, Result};
 pub use tower_lsp::lsp_types;
 pub use tower_lsp::{Client, LanguageServer, LspService, Server};

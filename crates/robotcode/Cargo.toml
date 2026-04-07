@@ -13,7 +13,6 @@ path = "src/main.rs"
 [dependencies]
 robotcode-jsonrpc2 = { path = "../robotcode-jsonrpc2" }
 robotcode-language-server = { path = "../robotcode-language-server" }
-tower-lsp.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true

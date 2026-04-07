@@ -1,8 +1,7 @@
 //! `RobotCodeServer` — implements the `tower_lsp::LanguageServer` trait.
 
-use robotcode_jsonrpc2::Result;
-use tower_lsp::lsp_types::*;
-use tower_lsp::{Client, LanguageServer};
+use robotcode_jsonrpc2::lsp_types::*;
+use robotcode_jsonrpc2::{async_trait, Client, LanguageServer, Result};
 use tracing::info;
 
 use crate::handlers::text_document;
@@ -22,7 +21,7 @@ impl RobotCodeServer {
     }
 }
 
-#[tower_lsp::async_trait]
+#[async_trait]
 impl LanguageServer for RobotCodeServer {
     async fn initialize(&self, params: InitializeParams) -> Result<InitializeResult> {
         info!(
