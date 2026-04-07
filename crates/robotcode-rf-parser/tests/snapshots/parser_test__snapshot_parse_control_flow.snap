@@ -1,0 +1,289 @@
+---
+source: crates/robotcode-rf-parser/tests/parser_test.rs
+expression: file
+---
+{
+  "sections": [
+    {
+      "type": "TestCases",
+      "header": {
+        "name": "*** Test Cases ***",
+        "position": {
+          "line": 0,
+          "column": 0,
+          "end_line": 0,
+          "end_column": 18
+        }
+      },
+      "body": [
+        {
+          "name": "Control Flow Test",
+          "position": {
+            "line": 1,
+            "column": 0,
+            "end_line": 1,
+            "end_column": 17
+          },
+          "body": [
+            {
+              "type": "For",
+              "variables": [
+                "${item}"
+              ],
+              "flavor": "IN",
+              "values": [
+                "a",
+                "b",
+                "c"
+              ],
+              "options": [],
+              "body": [
+                {
+                  "type": "KeywordCall",
+                  "assigns": [],
+                  "name": "Log",
+                  "args": [
+                    "${item}"
+                  ],
+                  "position": {
+                    "line": 3,
+                    "column": 8,
+                    "end_line": 3,
+                    "end_column": 11
+                  }
+                }
+              ],
+              "position": {
+                "line": 2,
+                "column": 4,
+                "end_line": 2,
+                "end_column": 7
+              }
+            },
+            {
+              "type": "If",
+              "branches": [
+                {
+                  "kind": "If",
+                  "condition": "${condition}",
+                  "body": [
+                    {
+                      "type": "KeywordCall",
+                      "assigns": [],
+                      "name": "Log",
+                      "args": [
+                        "true branch"
+                      ],
+                      "position": {
+                        "line": 6,
+                        "column": 8,
+                        "end_line": 6,
+                        "end_column": 11
+                      }
+                    }
+                  ],
+                  "position": {
+                    "line": 5,
+                    "column": 4,
+                    "end_line": 5,
+                    "end_column": 6
+                  }
+                },
+                {
+                  "kind": "ElseIf",
+                  "condition": "${other}",
+                  "body": [
+                    {
+                      "type": "KeywordCall",
+                      "assigns": [],
+                      "name": "Log",
+                      "args": [
+                        "else if branch"
+                      ],
+                      "position": {
+                        "line": 8,
+                        "column": 8,
+                        "end_line": 8,
+                        "end_column": 11
+                      }
+                    }
+                  ],
+                  "position": {
+                    "line": 7,
+                    "column": 4,
+                    "end_line": 7,
+                    "end_column": 11
+                  }
+                },
+                {
+                  "kind": "Else",
+                  "condition": null,
+                  "body": [
+                    {
+                      "type": "KeywordCall",
+                      "assigns": [],
+                      "name": "Log",
+                      "args": [
+                        "else branch"
+                      ],
+                      "position": {
+                        "line": 10,
+                        "column": 8,
+                        "end_line": 10,
+                        "end_column": 11
+                      }
+                    }
+                  ],
+                  "position": {
+                    "line": 9,
+                    "column": 4,
+                    "end_line": 9,
+                    "end_column": 8
+                  }
+                }
+              ],
+              "position": {
+                "line": 5,
+                "column": 4,
+                "end_line": 5,
+                "end_column": 6
+              }
+            },
+            {
+              "type": "Try",
+              "branches": [
+                {
+                  "kind": "Try",
+                  "patterns": [],
+                  "pattern_type": null,
+                  "var": null,
+                  "body": [
+                    {
+                      "type": "KeywordCall",
+                      "assigns": [],
+                      "name": "Fail",
+                      "args": [
+                        "intentional"
+                      ],
+                      "position": {
+                        "line": 13,
+                        "column": 8,
+                        "end_line": 13,
+                        "end_column": 12
+                      }
+                    }
+                  ],
+                  "position": {
+                    "line": 12,
+                    "column": 4,
+                    "end_line": 12,
+                    "end_column": 7
+                  }
+                },
+                {
+                  "kind": "Except",
+                  "patterns": [
+                    "intentional"
+                  ],
+                  "pattern_type": "LITERAL",
+                  "var": null,
+                  "body": [
+                    {
+                      "type": "KeywordCall",
+                      "assigns": [],
+                      "name": "Log",
+                      "args": [
+                        "caught"
+                      ],
+                      "position": {
+                        "line": 15,
+                        "column": 8,
+                        "end_line": 15,
+                        "end_column": 11
+                      }
+                    }
+                  ],
+                  "position": {
+                    "line": 14,
+                    "column": 4,
+                    "end_line": 14,
+                    "end_column": 10
+                  }
+                },
+                {
+                  "kind": "Finally",
+                  "patterns": [],
+                  "pattern_type": null,
+                  "var": null,
+                  "body": [
+                    {
+                      "type": "KeywordCall",
+                      "assigns": [],
+                      "name": "Log",
+                      "args": [
+                        "always runs"
+                      ],
+                      "position": {
+                        "line": 17,
+                        "column": 8,
+                        "end_line": 17,
+                        "end_column": 11
+                      }
+                    }
+                  ],
+                  "position": {
+                    "line": 16,
+                    "column": 4,
+                    "end_line": 16,
+                    "end_column": 11
+                  }
+                }
+              ],
+              "position": {
+                "line": 12,
+                "column": 4,
+                "end_line": 12,
+                "end_column": 7
+              }
+            },
+            {
+              "type": "While",
+              "condition": "${x} < 10",
+              "options": [],
+              "body": [
+                {
+                  "type": "Break",
+                  "position": {
+                    "line": 20,
+                    "column": 8,
+                    "end_line": 20,
+                    "end_column": 13
+                  }
+                }
+              ],
+              "position": {
+                "line": 19,
+                "column": 4,
+                "end_line": 19,
+                "end_column": 9
+              }
+            },
+            {
+              "type": "Return",
+              "values": [
+                "done"
+              ],
+              "position": {
+                "line": 22,
+                "column": 4,
+                "end_line": 22,
+                "end_column": 10
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "source": null
+}

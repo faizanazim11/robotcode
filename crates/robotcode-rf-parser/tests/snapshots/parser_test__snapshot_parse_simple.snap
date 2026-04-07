@@ -1,0 +1,64 @@
+---
+source: crates/robotcode-rf-parser/tests/parser_test.rs
+expression: file
+---
+{
+  "sections": [
+    {
+      "type": "TestCases",
+      "header": {
+        "name": "*** Test Cases ***",
+        "position": {
+          "line": 0,
+          "column": 0,
+          "end_line": 0,
+          "end_column": 18
+        }
+      },
+      "body": [
+        {
+          "name": "My Test",
+          "position": {
+            "line": 1,
+            "column": 0,
+            "end_line": 1,
+            "end_column": 7
+          },
+          "body": [
+            {
+              "type": "KeywordCall",
+              "assigns": [],
+              "name": "Log",
+              "args": [
+                "Hello World"
+              ],
+              "position": {
+                "line": 2,
+                "column": 4,
+                "end_line": 2,
+                "end_column": 7
+              }
+            },
+            {
+              "type": "KeywordCall",
+              "assigns": [
+                "${result}="
+              ],
+              "name": "Evaluate",
+              "args": [
+                "1 + 2"
+              ],
+              "position": {
+                "line": 3,
+                "column": 4,
+                "end_line": 3,
+                "end_column": 14
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "source": null
+}
