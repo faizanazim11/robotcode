@@ -4,6 +4,8 @@ members = [
     "crates/robotcode-rf-parser",
     "crates/robotcode-jsonrpc2",
     "crates/robotcode-language-server",
+    "crates/robotcode-python-bridge",
+    "crates/robotcode-robot",
     "crates/robotcode",
 ]
 resolver = "2"

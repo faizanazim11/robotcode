@@ -1,5 +1,8 @@
 //! `RobotCodeServer` — implements the `tower_lsp::LanguageServer` trait.
 
+use std::path::PathBuf;
+use std::sync::Arc;
+
 use robotcode_jsonrpc2::lsp_types::*;
 use robotcode_jsonrpc2::{async_trait, Client, LanguageServer, Result};
 use tracing::info;
@@ -12,12 +15,25 @@ use crate::handlers::text_document;
 /// eventually hold per-workspace state, document caches, etc.
 pub struct RobotCodeServer {
     client: Client,
+    /// Path to the Python interpreter for the Python bridge (if configured).
+    python: Option<Arc<PathBuf>>,
 }
 
 impl RobotCodeServer {
     /// Create a new server instance bound to `client`.
     pub fn new(client: Client) -> Self {
-        Self { client }
+        Self {
+            client,
+            python: None,
+        }
+    }
+
+    /// Create a server with a specific Python interpreter path for the bridge.
+    pub fn with_python(client: Client, python: Option<PathBuf>) -> Self {
+        Self {
+            client,
+            python: python.map(Arc::new),
+        }
     }
 }
 
@@ -26,6 +42,7 @@ impl LanguageServer for RobotCodeServer {
     async fn initialize(&self, params: InitializeParams) -> Result<InitializeResult> {
         info!(
             root_uri = ?params.root_uri,
+            python = ?self.python.as_deref().map(|p| p.display().to_string()),
             "Received initialize request"
         );
         Ok(InitializeResult {
