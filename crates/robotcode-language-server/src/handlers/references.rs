@@ -220,13 +220,11 @@ fn variable_references(
             Section::Variables(s) => {
                 for item in &s.body {
                     if let VariableItem::Variable(v) = item {
-                        if normalize_var_name(&v.name) == norm_name {
-                            if include_declaration {
-                                locs.push(Location {
-                                    uri: uri.clone(),
-                                    range: ast_pos_to_range(&v.position),
-                                });
-                            }
+                        if normalize_var_name(&v.name) == norm_name && include_declaration {
+                            locs.push(Location {
+                                uri: uri.clone(),
+                                range: ast_pos_to_range(&v.position),
+                            });
                         }
                     }
                 }
@@ -326,7 +324,7 @@ fn collect_var_refs_in_text(
 fn normalize_var_name(name: &str) -> String {
     let inner = name.trim_start_matches(['$', '@', '&', '%']);
     let inner = inner.trim_matches(['{', '}']);
-    inner.to_lowercase().replace(' ', "_").replace('-', "_")
+    inner.to_lowercase().replace([' ', '-'], "_")
 }
 
 #[cfg(test)]

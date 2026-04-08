@@ -269,7 +269,7 @@ fn hover_for_variable(name: &str, file: &File) -> Option<Hover> {
 fn normalize_var_name(name: &str) -> String {
     let inner = name.trim_start_matches(['$', '@', '&', '%']);
     let inner = inner.trim_matches(['{', '}']);
-    inner.to_lowercase().replace(' ', "_").replace('-', "_")
+    inner.to_lowercase().replace([' ', '-'], "_")
 }
 
 #[cfg(test)]

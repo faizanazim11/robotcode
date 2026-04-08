@@ -153,7 +153,7 @@ fn normalize_var_name(name: &str) -> String {
     // Strip leading sigil and braces: `${MY_VAR}` → `my_var`
     let inner = name.trim_start_matches(['$', '@', '&', '%']);
     let inner = inner.trim_matches(['{', '}']);
-    inner.to_lowercase().replace(' ', "_").replace('-', "_")
+    inner.to_lowercase().replace([' ', '-'], "_")
 }
 
 // ── Occurrence collection ─────────────────────────────────────────────────────
