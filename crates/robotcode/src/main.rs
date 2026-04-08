@@ -176,7 +176,7 @@ struct AnalyzeCliArgs {
     #[arg(long)]
     fail_on_warning: bool,
 
-    /// Path to the Python interpreter (reserved for future use).
+    /// Path to the Python interpreter (reserved for future Python-bridge diagnostics).
     #[arg(long, value_name = "PATH")]
     python: Option<PathBuf>,
 

@@ -151,10 +151,10 @@ fn parse_file(path: &Path) -> Option<DiscoveredSuite> {
         }
     };
 
-    let source_name = path.to_str().unwrap_or("");
+    let source_name = path.to_string_lossy();
     debug!(path = %path.display(), "Parsing RF file");
 
-    let file: ast::File = parse_with_source(&source, Some(source_name));
+    let file: ast::File = parse_with_source(&source, Some(&source_name));
 
     let mut tests = Vec::new();
     let mut keywords = Vec::new();

@@ -159,8 +159,8 @@ fn analyze_file(path: &PathBuf) -> Vec<Diagnostic> {
         }
     };
 
-    let source_name = path.to_str().unwrap_or("");
-    let file: ast::File = parse_with_source(&source, Some(source_name));
+    let source_name = path.to_string_lossy();
+    let file: ast::File = parse_with_source(&source, Some(&source_name));
 
     collect_ast_diagnostics(&file)
 }
