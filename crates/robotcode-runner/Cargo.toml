@@ -1,0 +1,20 @@
+[package]
+name = "robotcode-runner"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "CLI runner tools for Robot Framework (run, rebot, libdoc, testdoc, discover)"
+
+[dependencies]
+robotcode-rf-parser = { path = "../robotcode-rf-parser" }
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+tempfile.workspace = true

@@ -899,11 +899,30 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "robotcode-analyze",
+ "robotcode-debugger",
  "robotcode-jsonrpc2",
  "robotcode-language-server",
+ "robotcode-runner",
+ "serde_json",
  "tokio",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "robotcode-analyze"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "lsp-types",
+ "robotcode-rf-parser",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -924,6 +943,18 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
+]
+
+[[package]]
+name = "robotcode-debugger"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -980,6 +1011,20 @@ dependencies = [
  "lsp-types",
  "regex",
  "robotcode-python-bridge",
+ "robotcode-rf-parser",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "robotcode-runner"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
  "robotcode-rf-parser",
  "serde",
  "serde_json",

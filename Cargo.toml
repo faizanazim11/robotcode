@@ -6,6 +6,9 @@ members = [
     "crates/robotcode-language-server",
     "crates/robotcode-python-bridge",
     "crates/robotcode-robot",
+    "crates/robotcode-runner",
+    "crates/robotcode-analyze",
+    "crates/robotcode-debugger",
     "crates/robotcode",
 ]
 resolver = "2"
