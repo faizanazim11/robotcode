@@ -7,9 +7,7 @@
 //! - Sections → `SymbolKind::Namespace`
 
 use lsp_types::{DocumentSymbol, Range, SymbolKind};
-use robotcode_rf_parser::parser::ast::{
-    File, Section, SettingItem, VariableItem,
-};
+use robotcode_rf_parser::parser::ast::{File, Section, SettingItem, VariableItem};
 
 use super::utils::ast_pos_to_range;
 
@@ -215,7 +213,10 @@ mod tests {
         let file = parse(src);
         let symbols = document_symbols(&file);
         assert!(symbols.iter().any(|s| s.name.contains("Keywords")));
-        let kw_section = symbols.iter().find(|s| s.name.contains("Keywords")).unwrap();
+        let kw_section = symbols
+            .iter()
+            .find(|s| s.name.contains("Keywords"))
+            .unwrap();
         let children = kw_section.children.as_ref().unwrap();
         assert!(children.iter().any(|s| s.name == "My Keyword"));
     }
@@ -235,7 +236,10 @@ mod tests {
         let src = "*** Variables ***\n${MY_VAR}    value\n";
         let file = parse(src);
         let symbols = document_symbols(&file);
-        let var_section = symbols.iter().find(|s| s.name.contains("Variable")).unwrap();
+        let var_section = symbols
+            .iter()
+            .find(|s| s.name.contains("Variable"))
+            .unwrap();
         let children = var_section.children.as_ref().unwrap();
         assert!(children.iter().any(|s| s.name == "${MY_VAR}"));
     }

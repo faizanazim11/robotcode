@@ -19,13 +19,12 @@
 //! | 1   | `deprecated`            | Deprecated keyword calls              |
 
 use lsp_types::{
-    SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens,
-    SemanticTokensLegend,
+    SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens, SemanticTokensLegend,
 };
-use robotcode_rf_parser::parser::ast::{
-    BodyItem, File, Section, SettingItem, VariableItem,
-};
+use robotcode_rf_parser::parser::ast::{BodyItem, File, Section, SettingItem, VariableItem};
 use robotcode_rf_parser::variables::search_variable;
+
+use super::utils::{text_lines, token_cols};
 
 // ── Legend ────────────────────────────────────────────────────────────────────
 
@@ -78,9 +77,13 @@ struct RawToken {
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 /// Compute semantic tokens for the entire `file`.
-pub fn semantic_tokens(file: &File) -> SemanticTokens {
+///
+/// `text` is the raw document source and is used to compute accurate column
+/// offsets for variable references inside keyword-call arguments.
+pub fn semantic_tokens(file: &File, text: &str) -> SemanticTokens {
+    let lines = text_lines(text);
     let mut raw: Vec<RawToken> = Vec::new();
-    collect_file(&mut raw, file);
+    collect_file(&mut raw, file, &lines);
 
     // Sort by position (they should already be in order, but be defensive).
     raw.sort_by_key(|t| (t.line, t.start_char));
@@ -116,48 +119,118 @@ pub fn semantic_tokens(file: &File) -> SemanticTokens {
 
 // ── Collectors ────────────────────────────────────────────────────────────────
 
-fn collect_file(out: &mut Vec<RawToken>, file: &File) {
+fn collect_file(out: &mut Vec<RawToken>, file: &File, lines: &[&str]) {
     for section in &file.sections {
         match section {
             Section::Settings(s) => {
-                push(out, s.header.position.line, s.header.position.column, s.header.name.len() as u32, TT_NAMESPACE, 0);
+                push(
+                    out,
+                    s.header.position.line,
+                    s.header.position.column,
+                    s.header.name.len() as u32,
+                    TT_NAMESPACE,
+                    0,
+                );
                 for item in &s.body {
                     collect_setting(out, item);
                 }
             }
             Section::Variables(s) => {
-                push(out, s.header.position.line, s.header.position.column, s.header.name.len() as u32, TT_NAMESPACE, 0);
+                push(
+                    out,
+                    s.header.position.line,
+                    s.header.position.column,
+                    s.header.name.len() as u32,
+                    TT_NAMESPACE,
+                    0,
+                );
                 for item in &s.body {
                     if let VariableItem::Variable(v) = item {
-                        push(out, v.position.line, v.position.column, v.name.len() as u32, TT_VARIABLE, TM_DEFINITION);
+                        push(
+                            out,
+                            v.position.line,
+                            v.position.column,
+                            v.name.len() as u32,
+                            TT_VARIABLE,
+                            TM_DEFINITION,
+                        );
                     } else if let VariableItem::Comment(c) = item {
                         push_comment(out, &c.value, c.position.line, c.position.column);
                     }
                 }
             }
             Section::TestCases(s) => {
-                push(out, s.header.position.line, s.header.position.column, s.header.name.len() as u32, TT_NAMESPACE, 0);
+                push(
+                    out,
+                    s.header.position.line,
+                    s.header.position.column,
+                    s.header.name.len() as u32,
+                    TT_NAMESPACE,
+                    0,
+                );
                 for tc in &s.body {
-                    push(out, tc.position.line, tc.position.column, tc.name.len() as u32, TT_FUNCTION, TM_DEFINITION);
-                    collect_body(out, &tc.body);
+                    push(
+                        out,
+                        tc.position.line,
+                        tc.position.column,
+                        tc.name.len() as u32,
+                        TT_FUNCTION,
+                        TM_DEFINITION,
+                    );
+                    collect_body(out, &tc.body, lines);
                 }
             }
             Section::Tasks(s) => {
-                push(out, s.header.position.line, s.header.position.column, s.header.name.len() as u32, TT_NAMESPACE, 0);
+                push(
+                    out,
+                    s.header.position.line,
+                    s.header.position.column,
+                    s.header.name.len() as u32,
+                    TT_NAMESPACE,
+                    0,
+                );
                 for task in &s.body {
-                    push(out, task.position.line, task.position.column, task.name.len() as u32, TT_FUNCTION, TM_DEFINITION);
-                    collect_body(out, &task.body);
+                    push(
+                        out,
+                        task.position.line,
+                        task.position.column,
+                        task.name.len() as u32,
+                        TT_FUNCTION,
+                        TM_DEFINITION,
+                    );
+                    collect_body(out, &task.body, lines);
                 }
             }
             Section::Keywords(s) => {
-                push(out, s.header.position.line, s.header.position.column, s.header.name.len() as u32, TT_NAMESPACE, 0);
+                push(
+                    out,
+                    s.header.position.line,
+                    s.header.position.column,
+                    s.header.name.len() as u32,
+                    TT_NAMESPACE,
+                    0,
+                );
                 for kw in &s.body {
-                    push(out, kw.position.line, kw.position.column, kw.name.len() as u32, TT_FUNCTION, TM_DEFINITION);
-                    collect_body(out, &kw.body);
+                    push(
+                        out,
+                        kw.position.line,
+                        kw.position.column,
+                        kw.name.len() as u32,
+                        TT_FUNCTION,
+                        TM_DEFINITION,
+                    );
+                    collect_body(out, &kw.body, lines);
                 }
             }
             Section::Comments(s) => {
-                push(out, s.header.position.line, s.header.position.column, s.header.name.len() as u32, TT_NAMESPACE, 0);
+                push(
+                    out,
+                    s.header.position.line,
+                    s.header.position.column,
+                    s.header.name.len() as u32,
+                    TT_NAMESPACE,
+                    0,
+                );
                 for c in &s.body {
                     push_comment(out, &c.value, c.position.line, c.position.column);
                 }
@@ -170,47 +243,190 @@ fn collect_file(out: &mut Vec<RawToken>, file: &File) {
 fn collect_setting(out: &mut Vec<RawToken>, item: &SettingItem) {
     match item {
         SettingItem::LibraryImport(x) => {
-            push(out, x.position.line, x.position.column, "Library".len() as u32, TT_KEYWORD, 0);
-            push(out, x.position.line, x.position.column + "Library".len() as u32 + 4, x.name.len() as u32, TT_STRING, 0);
+            push(
+                out,
+                x.position.line,
+                x.position.column,
+                "Library".len() as u32,
+                TT_KEYWORD,
+                0,
+            );
+            push(
+                out,
+                x.position.line,
+                x.position.column + "Library".len() as u32 + 4,
+                x.name.len() as u32,
+                TT_STRING,
+                0,
+            );
         }
         SettingItem::ResourceImport(x) => {
-            push(out, x.position.line, x.position.column, "Resource".len() as u32, TT_KEYWORD, 0);
-            push(out, x.position.line, x.position.column + "Resource".len() as u32 + 4, x.path.len() as u32, TT_STRING, 0);
+            push(
+                out,
+                x.position.line,
+                x.position.column,
+                "Resource".len() as u32,
+                TT_KEYWORD,
+                0,
+            );
+            push(
+                out,
+                x.position.line,
+                x.position.column + "Resource".len() as u32 + 4,
+                x.path.len() as u32,
+                TT_STRING,
+                0,
+            );
         }
         SettingItem::VariablesImport(x) => {
-            push(out, x.position.line, x.position.column, "Variables".len() as u32, TT_KEYWORD, 0);
-            push(out, x.position.line, x.position.column + "Variables".len() as u32 + 4, x.path.len() as u32, TT_STRING, 0);
+            push(
+                out,
+                x.position.line,
+                x.position.column,
+                "Variables".len() as u32,
+                TT_KEYWORD,
+                0,
+            );
+            push(
+                out,
+                x.position.line,
+                x.position.column + "Variables".len() as u32 + 4,
+                x.path.len() as u32,
+                TT_STRING,
+                0,
+            );
         }
         SettingItem::Documentation(x) => {
-            push(out, x.position.line, x.position.column, "Documentation".len() as u32, TT_KEYWORD, 0);
-            push(out, x.position.line, x.position.column + "Documentation".len() as u32 + 4, x.value.len() as u32, TT_STRING, 0);
+            push(
+                out,
+                x.position.line,
+                x.position.column,
+                "Documentation".len() as u32,
+                TT_KEYWORD,
+                0,
+            );
+            push(
+                out,
+                x.position.line,
+                x.position.column + "Documentation".len() as u32 + 4,
+                x.value.len() as u32,
+                TT_STRING,
+                0,
+            );
         }
         SettingItem::SuiteSetup(x) => {
-            push(out, x.position.line, x.position.column, "Suite Setup".len() as u32, TT_KEYWORD, 0);
-            push(out, x.position.line, x.position.column + "Suite Setup".len() as u32 + 4, x.name.len() as u32, TT_FUNCTION, 0);
+            push(
+                out,
+                x.position.line,
+                x.position.column,
+                "Suite Setup".len() as u32,
+                TT_KEYWORD,
+                0,
+            );
+            push(
+                out,
+                x.position.line,
+                x.position.column + "Suite Setup".len() as u32 + 4,
+                x.name.len() as u32,
+                TT_FUNCTION,
+                0,
+            );
         }
         SettingItem::SuiteTeardown(x) => {
-            push(out, x.position.line, x.position.column, "Suite Teardown".len() as u32, TT_KEYWORD, 0);
-            push(out, x.position.line, x.position.column + "Suite Teardown".len() as u32 + 4, x.name.len() as u32, TT_FUNCTION, 0);
+            push(
+                out,
+                x.position.line,
+                x.position.column,
+                "Suite Teardown".len() as u32,
+                TT_KEYWORD,
+                0,
+            );
+            push(
+                out,
+                x.position.line,
+                x.position.column + "Suite Teardown".len() as u32 + 4,
+                x.name.len() as u32,
+                TT_FUNCTION,
+                0,
+            );
         }
         SettingItem::TestSetup(x) => {
-            push(out, x.position.line, x.position.column, "Test Setup".len() as u32, TT_KEYWORD, 0);
-            push(out, x.position.line, x.position.column + "Test Setup".len() as u32 + 4, x.name.len() as u32, TT_FUNCTION, 0);
+            push(
+                out,
+                x.position.line,
+                x.position.column,
+                "Test Setup".len() as u32,
+                TT_KEYWORD,
+                0,
+            );
+            push(
+                out,
+                x.position.line,
+                x.position.column + "Test Setup".len() as u32 + 4,
+                x.name.len() as u32,
+                TT_FUNCTION,
+                0,
+            );
         }
         SettingItem::TestTeardown(x) => {
-            push(out, x.position.line, x.position.column, "Test Teardown".len() as u32, TT_KEYWORD, 0);
-            push(out, x.position.line, x.position.column + "Test Teardown".len() as u32 + 4, x.name.len() as u32, TT_FUNCTION, 0);
+            push(
+                out,
+                x.position.line,
+                x.position.column,
+                "Test Teardown".len() as u32,
+                TT_KEYWORD,
+                0,
+            );
+            push(
+                out,
+                x.position.line,
+                x.position.column + "Test Teardown".len() as u32 + 4,
+                x.name.len() as u32,
+                TT_FUNCTION,
+                0,
+            );
         }
         SettingItem::TestTemplate(x) => {
-            push(out, x.position.line, x.position.column, "Test Template".len() as u32, TT_KEYWORD, 0);
-            push(out, x.position.line, x.position.column + "Test Template".len() as u32 + 4, x.name.len() as u32, TT_FUNCTION, 0);
+            push(
+                out,
+                x.position.line,
+                x.position.column,
+                "Test Template".len() as u32,
+                TT_KEYWORD,
+                0,
+            );
+            push(
+                out,
+                x.position.line,
+                x.position.column + "Test Template".len() as u32 + 4,
+                x.name.len() as u32,
+                TT_FUNCTION,
+                0,
+            );
         }
         SettingItem::Metadata(x) => {
-            push(out, x.position.line, x.position.column, "Metadata".len() as u32, TT_KEYWORD, 0);
+            push(
+                out,
+                x.position.line,
+                x.position.column,
+                "Metadata".len() as u32,
+                TT_KEYWORD,
+                0,
+            );
         }
-        SettingItem::TestTags(x) | SettingItem::DefaultTags(x) | SettingItem::ForceTags(x)
-        | SettingItem::KeywordTags(x) | SettingItem::TaskTags(x) => {
-            push(out, x.position.line, x.position.column, x.kind_name().len() as u32, TT_KEYWORD, 0);
+        SettingItem::TestTags(x)
+        | SettingItem::DefaultTags(x)
+        | SettingItem::ForceTags(x)
+        | SettingItem::KeywordTags(x)
+        | SettingItem::TaskTags(x) => {
+            push(
+                out,
+                x.position.line,
+                x.position.column,
+                x.kind_name().len() as u32,
+                TT_KEYWORD,
+                0,
+            );
         }
         SettingItem::Comment(c) => {
             push_comment(out, &c.value, c.position.line, c.position.column);
@@ -219,66 +435,159 @@ fn collect_setting(out: &mut Vec<RawToken>, item: &SettingItem) {
     }
 }
 
-fn collect_body(out: &mut Vec<RawToken>, items: &[BodyItem]) {
+fn collect_body(out: &mut Vec<RawToken>, items: &[BodyItem], lines: &[&str]) {
     for item in items {
-        collect_body_item(out, item);
+        collect_body_item(out, item, lines);
     }
 }
 
-fn collect_body_item(out: &mut Vec<RawToken>, item: &BodyItem) {
+fn collect_body_item(out: &mut Vec<RawToken>, item: &BodyItem, lines: &[&str]) {
     match item {
         BodyItem::KeywordCall(kc) => {
+            // Use the raw line to find accurate column positions for each token.
+            let line_text = lines.get(kc.position.line as usize).copied().unwrap_or("");
+            let cols = token_cols(line_text);
+            // Token layout on line: [assign0, assign1, ..., keyword_name, arg0, arg1, ...]
+            let name_idx = kc.assigns.len();
+
             // Assignments: `${var} =`
-            for assign in &kc.assigns {
-                push(out, kc.position.line, kc.position.column, assign.len() as u32, TT_VARIABLE, 0);
+            for (i, assign) in kc.assigns.iter().enumerate() {
+                let col = cols.get(i).copied().unwrap_or(kc.position.column);
+                push(
+                    out,
+                    kc.position.line,
+                    col,
+                    assign.len() as u32,
+                    TT_VARIABLE,
+                    0,
+                );
             }
-            let name_col = if kc.assigns.is_empty() {
-                kc.position.column
-            } else {
-                // Heuristic: put the keyword name after the last assignment.
-                // Exact column is hard without the raw text, so approximate.
-                kc.position.column + kc.assigns.iter().map(|a| a.len() as u32 + 4).sum::<u32>()
-            };
-            push(out, kc.position.line, name_col, kc.name.len() as u32, TT_FUNCTION, 0);
-            // Highlight variable references in arguments.
-            for arg in &kc.args {
-                collect_variable_refs(out, arg, kc.position.line);
+            let name_col = cols.get(name_idx).copied().unwrap_or(kc.position.column);
+            push(
+                out,
+                kc.position.line,
+                name_col,
+                kc.name.len() as u32,
+                TT_FUNCTION,
+                0,
+            );
+            // Highlight variable references in arguments at their accurate columns.
+            for (i, arg) in kc.args.iter().enumerate() {
+                let base_col = cols.get(name_idx + 1 + i).copied().unwrap_or(0);
+                collect_variable_refs_at(out, arg, kc.position.line, base_col);
             }
         }
         BodyItem::Arguments(a) => {
             for arg in &a.args {
-                push(out, a.position.line, a.position.column, arg.len() as u32, TT_VARIABLE, TM_DEFINITION);
+                push(
+                    out,
+                    a.position.line,
+                    a.position.column,
+                    arg.len() as u32,
+                    TT_VARIABLE,
+                    TM_DEFINITION,
+                );
             }
         }
         BodyItem::Documentation(d) => {
-            push(out, d.position.line, d.position.column, "Documentation".len() as u32, TT_KEYWORD, 0);
-            push(out, d.position.line, d.position.column + "Documentation".len() as u32 + 4, d.value.len() as u32, TT_STRING, 0);
+            push(
+                out,
+                d.position.line,
+                d.position.column,
+                "Documentation".len() as u32,
+                TT_KEYWORD,
+                0,
+            );
+            push(
+                out,
+                d.position.line,
+                d.position.column + "Documentation".len() as u32 + 4,
+                d.value.len() as u32,
+                TT_STRING,
+                0,
+            );
         }
         BodyItem::Tags(t) => {
-            push(out, t.position.line, t.position.column, t.kind_name().len() as u32, TT_KEYWORD, 0);
+            push(
+                out,
+                t.position.line,
+                t.position.column,
+                t.kind_name().len() as u32,
+                TT_KEYWORD,
+                0,
+            );
         }
         BodyItem::Setup(f) | BodyItem::Teardown(f) => {
             let label = f.kind_name();
-            push(out, f.position.line, f.position.column, label.len() as u32, TT_KEYWORD, 0);
-            push(out, f.position.line, f.position.column + label.len() as u32 + 4, f.name.len() as u32, TT_FUNCTION, 0);
+            push(
+                out,
+                f.position.line,
+                f.position.column,
+                label.len() as u32,
+                TT_KEYWORD,
+                0,
+            );
+            push(
+                out,
+                f.position.line,
+                f.position.column + label.len() as u32 + 4,
+                f.name.len() as u32,
+                TT_FUNCTION,
+                0,
+            );
         }
         BodyItem::Template(t) => {
-            push(out, t.position.line, t.position.column, "Template".len() as u32, TT_KEYWORD, 0);
-            push(out, t.position.line, t.position.column + "Template".len() as u32 + 4, t.name.len() as u32, TT_FUNCTION, 0);
+            push(
+                out,
+                t.position.line,
+                t.position.column,
+                "Template".len() as u32,
+                TT_KEYWORD,
+                0,
+            );
+            push(
+                out,
+                t.position.line,
+                t.position.column + "Template".len() as u32 + 4,
+                t.name.len() as u32,
+                TT_FUNCTION,
+                0,
+            );
         }
         BodyItem::Comment(c) => {
             push_comment(out, &c.value, c.position.line, c.position.column);
         }
         BodyItem::For(f) => {
-            push(out, f.position.line, f.position.column, "FOR".len() as u32, TT_KEYWORD, 0);
+            push(
+                out,
+                f.position.line,
+                f.position.column,
+                "FOR".len() as u32,
+                TT_KEYWORD,
+                0,
+            );
             for var in &f.variables {
-                push(out, f.position.line, f.position.column, var.len() as u32, TT_VARIABLE, 0);
+                push(
+                    out,
+                    f.position.line,
+                    f.position.column,
+                    var.len() as u32,
+                    TT_VARIABLE,
+                    0,
+                );
             }
-            collect_body(out, &f.body);
+            collect_body(out, &f.body, lines);
         }
         BodyItem::While(w) => {
-            push(out, w.position.line, w.position.column, "WHILE".len() as u32, TT_KEYWORD, 0);
-            collect_body(out, &w.body);
+            push(
+                out,
+                w.position.line,
+                w.position.column,
+                "WHILE".len() as u32,
+                TT_KEYWORD,
+                0,
+            );
+            collect_body(out, &w.body, lines);
         }
         BodyItem::If(iblk) => {
             for branch in &iblk.branches {
@@ -287,8 +596,15 @@ fn collect_body_item(out: &mut Vec<RawToken>, item: &BodyItem) {
                     robotcode_rf_parser::parser::ast::IfKind::ElseIf => "ELSE IF",
                     robotcode_rf_parser::parser::ast::IfKind::Else => "ELSE",
                 };
-                push(out, branch.position.line, branch.position.column, kw.len() as u32, TT_KEYWORD, 0);
-                collect_body(out, &branch.body);
+                push(
+                    out,
+                    branch.position.line,
+                    branch.position.column,
+                    kw.len() as u32,
+                    TT_KEYWORD,
+                    0,
+                );
+                collect_body(out, &branch.body, lines);
             }
         }
         BodyItem::Try(tblk) => {
@@ -299,35 +615,78 @@ fn collect_body_item(out: &mut Vec<RawToken>, item: &BodyItem) {
                     robotcode_rf_parser::parser::ast::TryKind::Else => "ELSE",
                     robotcode_rf_parser::parser::ast::TryKind::Finally => "FINALLY",
                 };
-                push(out, branch.position.line, branch.position.column, kw.len() as u32, TT_KEYWORD, 0);
-                collect_body(out, &branch.body);
+                push(
+                    out,
+                    branch.position.line,
+                    branch.position.column,
+                    kw.len() as u32,
+                    TT_KEYWORD,
+                    0,
+                );
+                collect_body(out, &branch.body, lines);
             }
         }
         BodyItem::Return(r) => {
-            push(out, r.position.line, r.position.column, "RETURN".len() as u32, TT_KEYWORD, 0);
+            push(
+                out,
+                r.position.line,
+                r.position.column,
+                "RETURN".len() as u32,
+                TT_KEYWORD,
+                0,
+            );
         }
         BodyItem::Break(b) => {
-            push(out, b.position.line, b.position.column, "BREAK".len() as u32, TT_KEYWORD, 0);
+            push(
+                out,
+                b.position.line,
+                b.position.column,
+                "BREAK".len() as u32,
+                TT_KEYWORD,
+                0,
+            );
         }
         BodyItem::Continue(c) => {
-            push(out, c.position.line, c.position.column, "CONTINUE".len() as u32, TT_KEYWORD, 0);
+            push(
+                out,
+                c.position.line,
+                c.position.column,
+                "CONTINUE".len() as u32,
+                TT_KEYWORD,
+                0,
+            );
         }
         BodyItem::ReturnSetting(r) => {
-            push(out, r.position.line, r.position.column, "Return".len() as u32, TT_KEYWORD, 0);
+            push(
+                out,
+                r.position.line,
+                r.position.column,
+                "Return".len() as u32,
+                TT_KEYWORD,
+                0,
+            );
         }
         BodyItem::Timeout(t) => {
-            push(out, t.position.line, t.position.column, "Timeout".len() as u32, TT_KEYWORD, 0);
+            push(
+                out,
+                t.position.line,
+                t.position.column,
+                "Timeout".len() as u32,
+                TT_KEYWORD,
+                0,
+            );
         }
         BodyItem::TemplateArguments(_) | BodyItem::EmptyLine(_) | BodyItem::Error(_) => {}
     }
 }
 
-/// Collect `${var}` and `@{var}` references inside `text`.
-fn collect_variable_refs(out: &mut Vec<RawToken>, text: &str, line: u32) {
+/// Collect `${var}` and `@{var}` references inside `text`, emitting tokens at
+/// `base_col + offset_within_text` so positions are relative to the document line.
+fn collect_variable_refs_at(out: &mut Vec<RawToken>, text: &str, line: u32, base_col: u32) {
     let mut remaining = text;
     let mut offset: u32 = 0;
     while let Some(m) = search_variable(remaining) {
-        let start = offset + m.start as u32;
+        let start = base_col + offset + m.start as u32;
         let len = (m.end - m.start) as u32;
         push(out, line, start, len, TT_VARIABLE, 0);
         let consumed = m.end;
@@ -339,11 +698,24 @@ fn collect_variable_refs(out: &mut Vec<RawToken>, text: &str, line: u32) {
     }
 }
 
-fn push(out: &mut Vec<RawToken>, line: u32, start_char: u32, length: u32, token_type: u32, token_modifiers: u32) {
+fn push(
+    out: &mut Vec<RawToken>,
+    line: u32,
+    start_char: u32,
+    length: u32,
+    token_type: u32,
+    token_modifiers: u32,
+) {
     if length == 0 {
         return;
     }
-    out.push(RawToken { line, start_char, length, token_type, token_modifiers });
+    out.push(RawToken {
+        line,
+        start_char,
+        length,
+        token_type,
+        token_modifiers,
+    });
 }
 
 fn push_comment(out: &mut Vec<RawToken>, value: &str, line: u32, col: u32) {
@@ -393,7 +765,7 @@ mod tests {
     fn test_semantic_tokens_non_empty() {
         let src = "*** Keywords ***\nMy Keyword\n    Log    hello\n";
         let file = parse(src);
-        let tokens = semantic_tokens(&file);
+        let tokens = semantic_tokens(&file, src);
         assert!(!tokens.data.is_empty());
     }
 
@@ -401,7 +773,7 @@ mod tests {
     fn test_semantic_tokens_ordering() {
         let src = "*** Settings ***\nLibrary    Collections\n\n*** Keywords ***\nMy Keyword\n    Log    hello\n";
         let file = parse(src);
-        let tokens = semantic_tokens(&file);
+        let tokens = semantic_tokens(&file, src);
         // Delta-encoded: reconstruct absolute positions and verify they're sorted.
         let mut line: u32 = 0;
         let mut char: u32 = 0;
@@ -420,7 +792,10 @@ mod tests {
             s.sort();
             s
         };
-        assert_eq!(positions, sorted, "Semantic tokens must be sorted by position");
+        assert_eq!(
+            positions, sorted,
+            "Semantic tokens must be sorted by position"
+        );
     }
 
     #[test]

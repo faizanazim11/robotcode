@@ -4,8 +4,8 @@
 //! currently active argument highlighted.
 
 use lsp_types::{
-    Documentation, MarkupContent, MarkupKind, ParameterInformation, ParameterLabel,
-    Position, SignatureHelp, SignatureInformation,
+    Documentation, MarkupContent, MarkupKind, ParameterInformation, ParameterLabel, Position,
+    SignatureHelp, SignatureInformation,
 };
 use robotcode_rf_parser::parser::ast::{BodyItem, File, Section};
 use robotcode_robot::diagnostics::{keyword_finder::KeywordMatch, Namespace};
@@ -71,7 +71,9 @@ fn find_in_body(items: &[BodyItem], pos: Position) -> Option<(String, u32)> {
                             .find_map(|(i, _a)| {
                                 // Try to find which arg column the cursor falls in.
                                 let estimated_col = i as u32 * 12;
-                                if relative >= estimated_col && (i + 1 >= kc.args.len() || relative < (i as u32 + 1) * 12) {
+                                if relative >= estimated_col
+                                    && (i + 1 >= kc.args.len() || relative < (i as u32 + 1) * 12)
+                                {
                                     Some(i as u32)
                                 } else {
                                     None
@@ -114,10 +116,18 @@ fn find_in_body(items: &[BodyItem], pos: Position) -> Option<(String, u32)> {
 
 // ── Signature building ────────────────────────────────────────────────────────
 
-fn build_signature(ns: &Namespace, file: &File, kw_name: &str, arg_index: u32) -> Option<SignatureHelp> {
+fn build_signature(
+    ns: &Namespace,
+    file: &File,
+    kw_name: &str,
+    arg_index: u32,
+) -> Option<SignatureHelp> {
     // Try namespace keywords first.
     if let KeywordMatch::Found(kw) = ns.find_keyword(kw_name) {
-        let label = format_signature_label(&kw.name, &kw.args.iter().map(|a| a.name.clone()).collect::<Vec<_>>());
+        let label = format_signature_label(
+            &kw.name,
+            &kw.args.iter().map(|a| a.name.clone()).collect::<Vec<_>>(),
+        );
         let parameters: Vec<ParameterInformation> = kw
             .args
             .iter()
@@ -161,13 +171,17 @@ fn build_signature(ns: &Namespace, file: &File, kw_name: &str, arg_index: u32) -
         if let Section::Keywords(s) = section {
             for kw in &s.body {
                 if kw.name == kw_name {
-                    let args: Vec<String> = kw.body.iter().find_map(|item| {
-                        if let BodyItem::Arguments(a) = item {
-                            Some(a.args.clone())
-                        } else {
-                            None
-                        }
-                    }).unwrap_or_default();
+                    let args: Vec<String> = kw
+                        .body
+                        .iter()
+                        .find_map(|item| {
+                            if let BodyItem::Arguments(a) = item {
+                                Some(a.args.clone())
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or_default();
 
                     let label = format_signature_label(&kw.name, &args);
                     let parameters: Vec<ParameterInformation> = args
@@ -223,7 +237,10 @@ mod tests {
         let file = parse(src);
         let ns = Namespace::new(None);
         // Position in the args of "My Keyword" call.
-        let pos = Position { line: 6, character: 20 };
+        let pos = Position {
+            line: 6,
+            character: 20,
+        };
         let result = signature_help(&file, &ns, pos);
         assert!(result.is_some());
         let sh = result.unwrap();
@@ -237,7 +254,10 @@ mod tests {
         let file = parse(src);
         let ns = Namespace::new(None);
         // Position at the start of "Log" keyword.
-        let pos = Position { line: 2, character: 4 };
+        let pos = Position {
+            line: 2,
+            character: 4,
+        };
         let result = signature_help(&file, &ns, pos);
         // Cursor is on the keyword name itself, not in args.
         assert!(result.is_none());

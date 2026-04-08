@@ -37,7 +37,9 @@ pub fn goto_definition(
                 }
                 // Try the namespace (libraries / resources).
                 let kw_match = ns.find_keyword(&name);
-                if let robotcode_robot::diagnostics::keyword_finder::KeywordMatch::Found(kw) = kw_match {
+                if let robotcode_robot::diagnostics::keyword_finder::KeywordMatch::Found(kw) =
+                    kw_match
+                {
                     if let Some(source) = &kw.source {
                         if let Ok(def_uri) = Url::from_file_path(source) {
                             let line = kw.line_no.unwrap_or(1).saturating_sub(1);
@@ -77,10 +79,12 @@ pub fn goto_definition(
                                 if let BodyItem::Arguments(args) = item {
                                     for arg in &args.args {
                                         if normalize_var_name(arg) == normalized {
-                                            return Some(GotoDefinitionResponse::Scalar(Location {
-                                                uri: uri.clone(),
-                                                range: ast_pos_to_range(&args.position),
-                                            }));
+                                            return Some(GotoDefinitionResponse::Scalar(
+                                                Location {
+                                                    uri: uri.clone(),
+                                                    range: ast_pos_to_range(&args.position),
+                                                },
+                                            ));
                                         }
                                     }
                                 }
@@ -207,7 +211,10 @@ mod tests {
         let src = "*** Test Cases ***\nMy Test\n    My Keyword\n*** Keywords ***\nMy Keyword\n    Log    hi\n";
         let file = parse(src);
         let ns = Namespace::new(None);
-        let pos = Position { line: 2, character: 4 }; // on "My Keyword" call
+        let pos = Position {
+            line: 2,
+            character: 4,
+        }; // on "My Keyword" call
         let result = goto_definition(&file, &ns, &test_uri(), pos);
         assert!(result.is_some(), "Should find local keyword definition");
         if let Some(GotoDefinitionResponse::Scalar(loc)) = result {
@@ -221,7 +228,10 @@ mod tests {
         let src = "*** Keywords ***\nMy Keyword\n    Log    hi\n";
         let file = parse(src);
         let ns = Namespace::new(None);
-        let pos = Position { line: 0, character: 0 }; // on section header
+        let pos = Position {
+            line: 0,
+            character: 0,
+        }; // on section header
         let result = goto_definition(&file, &ns, &test_uri(), pos);
         assert!(result.is_none());
     }

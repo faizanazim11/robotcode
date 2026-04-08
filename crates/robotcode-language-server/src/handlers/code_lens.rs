@@ -43,8 +43,14 @@ pub fn code_lens(file: &File, uri: &Url) -> Vec<CodeLens> {
 fn run_lens(uri: &Url, name: &str, range: Range) -> CodeLens {
     CodeLens {
         range: Range {
-            start: Position { line: range.start.line, character: 0 },
-            end: Position { line: range.start.line, character: 0 },
+            start: Position {
+                line: range.start.line,
+                character: 0,
+            },
+            end: Position {
+                line: range.start.line,
+                character: 0,
+            },
         },
         command: Some(Command {
             title: "▶ Run Test".to_string(),
@@ -61,8 +67,14 @@ fn run_lens(uri: &Url, name: &str, range: Range) -> CodeLens {
 fn debug_lens(uri: &Url, name: &str, range: Range) -> CodeLens {
     CodeLens {
         range: Range {
-            start: Position { line: range.start.line, character: 0 },
-            end: Position { line: range.start.line, character: 0 },
+            start: Position {
+                line: range.start.line,
+                character: 0,
+            },
+            end: Position {
+                line: range.start.line,
+                character: 0,
+            },
         },
         command: Some(Command {
             title: "🐛 Debug Test".to_string(),
@@ -87,7 +99,8 @@ mod tests {
 
     #[test]
     fn test_code_lens_for_test_cases() {
-        let src = "*** Test Cases ***\nMy First Test\n    Log    hi\nMy Second Test\n    Log    bye\n";
+        let src =
+            "*** Test Cases ***\nMy First Test\n    Log    hi\nMy Second Test\n    Log    bye\n";
         let file = parse(src);
         let lenses = code_lens(&file, &test_uri());
         // 2 tests × 2 lenses each = 4.
@@ -122,10 +135,20 @@ mod tests {
         let file = parse(src);
         let lenses = code_lens(&file, &test_uri());
         let run_lens = lenses.iter().find(|l| {
-            l.command.as_ref().map(|c| c.command == "robotcode.runTest").unwrap_or(false)
+            l.command
+                .as_ref()
+                .map(|c| c.command == "robotcode.runTest")
+                .unwrap_or(false)
         });
         assert!(run_lens.is_some());
-        let args = run_lens.unwrap().command.as_ref().unwrap().arguments.as_ref().unwrap();
+        let args = run_lens
+            .unwrap()
+            .command
+            .as_ref()
+            .unwrap()
+            .arguments
+            .as_ref()
+            .unwrap();
         assert!(args[1].as_str().unwrap() == "Suite Login Test");
     }
 }

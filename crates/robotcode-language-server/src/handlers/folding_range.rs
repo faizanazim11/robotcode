@@ -256,8 +256,8 @@ fn collect_body_ranges(items: &[BodyItem], out: &mut Vec<FoldingRange>) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::utils::ast_pos_to_range;
+    use super::*;
     use robotcode_rf_parser::parser::parse;
 
     #[test]

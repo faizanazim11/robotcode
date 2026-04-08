@@ -8,14 +8,25 @@ use lsp_types::{Location, Position, Range, Url};
 use robotcode_rf_parser::parser::ast::{BodyItem, File, Section, VariableItem};
 use robotcode_rf_parser::variables::search_variable;
 
-use super::utils::{ast_pos_to_range, position_in_ast};
+use super::utils::{ast_pos_to_range, position_in_ast, text_lines, token_cols};
 
 /// Find all references to the symbol at `pos` in `file`.
-pub fn references(file: &File, uri: &Url, pos: Position, include_declaration: bool) -> Vec<Location> {
+///
+/// `text` is the raw document source used to compute accurate argument column offsets.
+pub fn references(
+    file: &File,
+    text: &str,
+    uri: &Url,
+    pos: Position,
+    include_declaration: bool,
+) -> Vec<Location> {
+    let lines = text_lines(text);
     let token = token_at(file, pos);
     match token {
         Some(Token::Keyword(name)) => keyword_references(file, uri, &name, include_declaration),
-        Some(Token::Variable(norm)) => variable_references(file, uri, &norm, include_declaration),
+        Some(Token::Variable(norm)) => {
+            variable_references(file, &lines, uri, &norm, include_declaration)
+        }
         None => vec![],
     }
 }
@@ -113,7 +124,12 @@ fn find_in_body(items: &[BodyItem], pos: Position) -> Option<Token> {
 
 // ── Keyword references ────────────────────────────────────────────────────────
 
-fn keyword_references(file: &File, uri: &Url, name: &str, include_declaration: bool) -> Vec<Location> {
+fn keyword_references(
+    file: &File,
+    uri: &Url,
+    name: &str,
+    include_declaration: bool,
+) -> Vec<Location> {
     let mut locs = Vec::new();
 
     for section in &file.sections {
@@ -121,7 +137,10 @@ fn keyword_references(file: &File, uri: &Url, name: &str, include_declaration: b
             Section::Keywords(s) => {
                 for kw in &s.body {
                     if include_declaration && kw.name == name {
-                        locs.push(Location { uri: uri.clone(), range: ast_pos_to_range(&kw.position) });
+                        locs.push(Location {
+                            uri: uri.clone(),
+                            range: ast_pos_to_range(&kw.position),
+                        });
                     }
                     collect_keyword_calls_in_body(&kw.body, name, uri, &mut locs);
                 }
@@ -143,7 +162,12 @@ fn keyword_references(file: &File, uri: &Url, name: &str, include_declaration: b
     locs
 }
 
-fn collect_keyword_calls_in_body(items: &[BodyItem], name: &str, uri: &Url, out: &mut Vec<Location>) {
+fn collect_keyword_calls_in_body(
+    items: &[BodyItem],
+    name: &str,
+    uri: &Url,
+    out: &mut Vec<Location>,
+) {
     for item in items {
         match item {
             BodyItem::KeywordCall(kc) => {
@@ -151,8 +175,14 @@ fn collect_keyword_calls_in_body(items: &[BodyItem], name: &str, uri: &Url, out:
                     out.push(Location {
                         uri: uri.clone(),
                         range: Range {
-                            start: Position { line: kc.position.line, character: kc.position.column },
-                            end: Position { line: kc.position.line, character: kc.position.column + kc.name.len() as u32 },
+                            start: Position {
+                                line: kc.position.line,
+                                character: kc.position.column,
+                            },
+                            end: Position {
+                                line: kc.position.line,
+                                character: kc.position.column + kc.name.len() as u32,
+                            },
                         },
                     });
                 }
@@ -176,7 +206,13 @@ fn collect_keyword_calls_in_body(items: &[BodyItem], name: &str, uri: &Url, out:
 
 // ── Variable references ───────────────────────────────────────────────────────
 
-fn variable_references(file: &File, uri: &Url, norm_name: &str, include_declaration: bool) -> Vec<Location> {
+fn variable_references(
+    file: &File,
+    lines: &[&str],
+    uri: &Url,
+    norm_name: &str,
+    include_declaration: bool,
+) -> Vec<Location> {
     let mut locs = Vec::new();
 
     for section in &file.sections {
@@ -186,7 +222,10 @@ fn variable_references(file: &File, uri: &Url, norm_name: &str, include_declarat
                     if let VariableItem::Variable(v) = item {
                         if normalize_var_name(&v.name) == norm_name {
                             if include_declaration {
-                                locs.push(Location { uri: uri.clone(), range: ast_pos_to_range(&v.position) });
+                                locs.push(Location {
+                                    uri: uri.clone(),
+                                    range: ast_pos_to_range(&v.position),
+                                });
                             }
                         }
                     }
@@ -194,17 +233,17 @@ fn variable_references(file: &File, uri: &Url, norm_name: &str, include_declarat
             }
             Section::TestCases(s) => {
                 for tc in &s.body {
-                    collect_var_refs_in_body(&tc.body, norm_name, uri, &mut locs);
+                    collect_var_refs_in_body(&tc.body, lines, norm_name, uri, &mut locs);
                 }
             }
             Section::Tasks(s) => {
                 for task in &s.body {
-                    collect_var_refs_in_body(&task.body, norm_name, uri, &mut locs);
+                    collect_var_refs_in_body(&task.body, lines, norm_name, uri, &mut locs);
                 }
             }
             Section::Keywords(s) => {
                 for kw in &s.body {
-                    collect_var_refs_in_body(&kw.body, norm_name, uri, &mut locs);
+                    collect_var_refs_in_body(&kw.body, lines, norm_name, uri, &mut locs);
                 }
             }
             _ => {}
@@ -214,24 +253,34 @@ fn variable_references(file: &File, uri: &Url, norm_name: &str, include_declarat
     locs
 }
 
-fn collect_var_refs_in_body(items: &[BodyItem], norm_name: &str, uri: &Url, out: &mut Vec<Location>) {
+fn collect_var_refs_in_body(
+    items: &[BodyItem],
+    lines: &[&str],
+    norm_name: &str,
+    uri: &Url,
+    out: &mut Vec<Location>,
+) {
     for item in items {
         match item {
             BodyItem::KeywordCall(kc) => {
-                for arg in &kc.args {
-                    collect_var_refs_in_text(arg, norm_name, kc.position.line, uri, out);
+                let line_text = lines.get(kc.position.line as usize).copied().unwrap_or("");
+                let cols = token_cols(line_text);
+                let name_idx = kc.assigns.len();
+                for (i, arg) in kc.args.iter().enumerate() {
+                    let base_col = cols.get(name_idx + 1 + i).copied().unwrap_or(0);
+                    collect_var_refs_in_text(arg, norm_name, kc.position.line, base_col, uri, out);
                 }
             }
-            BodyItem::For(f) => collect_var_refs_in_body(&f.body, norm_name, uri, out),
-            BodyItem::While(w) => collect_var_refs_in_body(&w.body, norm_name, uri, out),
+            BodyItem::For(f) => collect_var_refs_in_body(&f.body, lines, norm_name, uri, out),
+            BodyItem::While(w) => collect_var_refs_in_body(&w.body, lines, norm_name, uri, out),
             BodyItem::If(iblk) => {
                 for branch in &iblk.branches {
-                    collect_var_refs_in_body(&branch.body, norm_name, uri, out);
+                    collect_var_refs_in_body(&branch.body, lines, norm_name, uri, out);
                 }
             }
             BodyItem::Try(tblk) => {
                 for branch in &tblk.branches {
-                    collect_var_refs_in_body(&branch.body, norm_name, uri, out);
+                    collect_var_refs_in_body(&branch.body, lines, norm_name, uri, out);
                 }
             }
             _ => {}
@@ -239,7 +288,14 @@ fn collect_var_refs_in_body(items: &[BodyItem], norm_name: &str, uri: &Url, out:
     }
 }
 
-fn collect_var_refs_in_text(text: &str, norm_name: &str, line: u32, uri: &Url, out: &mut Vec<Location>) {
+fn collect_var_refs_in_text(
+    text: &str,
+    norm_name: &str,
+    line: u32,
+    base_col: u32,
+    uri: &Url,
+    out: &mut Vec<Location>,
+) {
     let mut remaining = text;
     let mut offset: u32 = 0;
     while let Some(m) = search_variable(remaining) {
@@ -248,8 +304,14 @@ fn collect_var_refs_in_text(text: &str, norm_name: &str, line: u32, uri: &Url, o
             out.push(Location {
                 uri: uri.clone(),
                 range: Range {
-                    start: Position { line, character: offset + m.start as u32 },
-                    end: Position { line, character: offset + m.end as u32 },
+                    start: Position {
+                        line,
+                        character: base_col + offset + m.start as u32,
+                    },
+                    end: Position {
+                        line,
+                        character: base_col + offset + m.end as u32,
+                    },
                 },
             });
         }
@@ -280,8 +342,11 @@ mod tests {
     fn test_keyword_references_includes_call_sites() {
         let src = "*** Keywords ***\nMy Keyword\n    Log    hi\n*** Test Cases ***\nMy Test\n    My Keyword\n    My Keyword\n";
         let file = parse(src);
-        let pos = Position { line: 1, character: 0 }; // On keyword definition
-        let refs = references(&file, &test_uri(), pos, false);
+        let pos = Position {
+            line: 1,
+            character: 0,
+        }; // On keyword definition
+        let refs = references(&file, src, &test_uri(), pos, false);
         // Should find 2 call sites.
         assert_eq!(refs.len(), 2, "Should find 2 call sites of My Keyword");
     }
@@ -290,8 +355,11 @@ mod tests {
     fn test_keyword_references_with_declaration() {
         let src = "*** Keywords ***\nMy Keyword\n    Log    hi\n*** Test Cases ***\nMy Test\n    My Keyword\n";
         let file = parse(src);
-        let pos = Position { line: 1, character: 0 };
-        let refs = references(&file, &test_uri(), pos, true);
+        let pos = Position {
+            line: 1,
+            character: 0,
+        };
+        let refs = references(&file, src, &test_uri(), pos, true);
         assert_eq!(refs.len(), 2, "Should find definition + 1 call site");
     }
 
@@ -299,8 +367,11 @@ mod tests {
     fn test_no_references_on_empty_pos() {
         let src = "*** Keywords ***\nMy Keyword\n    Log    hi\n";
         let file = parse(src);
-        let pos = Position { line: 0, character: 0 }; // Section header
-        let refs = references(&file, &test_uri(), pos, false);
+        let pos = Position {
+            line: 0,
+            character: 0,
+        }; // Section header
+        let refs = references(&file, src, &test_uri(), pos, false);
         assert!(refs.is_empty());
     }
 }

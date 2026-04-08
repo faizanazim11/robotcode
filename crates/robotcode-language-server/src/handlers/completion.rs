@@ -6,9 +6,7 @@
 //! - Setting names in the Settings section
 //! - BDD prefixes (Given, When, Then, And, But)
 
-use lsp_types::{
-    CompletionItem, CompletionItemKind, InsertTextFormat, Position,
-};
+use lsp_types::{CompletionItem, CompletionItemKind, InsertTextFormat, Position};
 use robotcode_rf_parser::parser::ast::{BodyItem, File, Section, SettingItem, VariableItem};
 use robotcode_robot::diagnostics::Namespace;
 
@@ -107,10 +105,12 @@ fn keyword_completions(file: &File, ns: &Namespace) -> Vec<CompletionItem> {
         let doc = if kw.doc.is_empty() {
             None
         } else {
-            Some(lsp_types::Documentation::MarkupContent(lsp_types::MarkupContent {
-                kind: lsp_types::MarkupKind::Markdown,
-                value: kw.doc.clone(),
-            }))
+            Some(lsp_types::Documentation::MarkupContent(
+                lsp_types::MarkupContent {
+                    kind: lsp_types::MarkupKind::Markdown,
+                    value: kw.doc.clone(),
+                },
+            ))
         };
 
         // Build snippet with argument placeholders.
@@ -145,13 +145,17 @@ fn keyword_completions(file: &File, ns: &Namespace) -> Vec<CompletionItem> {
                 // Avoid duplicating namespace keywords.
                 if !items.iter().any(|i| i.label == kw.name) {
                     // Extract [Arguments] from keyword body.
-                    let args: Vec<String> = kw.body.iter().find_map(|item| {
-                        if let BodyItem::Arguments(a) = item {
-                            Some(a.args.clone())
-                        } else {
-                            None
-                        }
-                    }).unwrap_or_default();
+                    let args: Vec<String> = kw
+                        .body
+                        .iter()
+                        .find_map(|item| {
+                            if let BodyItem::Arguments(a) = item {
+                                Some(a.args.clone())
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or_default();
 
                     let snippet = if args.is_empty() {
                         kw.name.clone()
@@ -187,10 +191,21 @@ fn variable_completions(file: &File, ns: &Namespace) -> Vec<CompletionItem> {
 
     // Built-in RF variables.
     for name in &[
-        "${EMPTY}", "${SPACE}", "${TRUE}", "${FALSE}", "${NONE}",
-        "${TEST NAME}", "${TEST STATUS}", "${SUITE NAME}", "${SUITE STATUS}",
-        "${OUTPUT DIR}", "${LOG FILE}", "${REPORT FILE}",
-        "${PREV TEST NAME}", "${PREV TEST STATUS}", "${PREV TEST MESSAGE}",
+        "${EMPTY}",
+        "${SPACE}",
+        "${TRUE}",
+        "${FALSE}",
+        "${NONE}",
+        "${TEST NAME}",
+        "${TEST STATUS}",
+        "${SUITE NAME}",
+        "${SUITE STATUS}",
+        "${OUTPUT DIR}",
+        "${LOG FILE}",
+        "${REPORT FILE}",
+        "${PREV TEST NAME}",
+        "${PREV TEST STATUS}",
+        "${PREV TEST MESSAGE}",
     ] {
         items.push(CompletionItem {
             label: name.to_string(),
@@ -237,7 +252,10 @@ fn variable_completions(file: &File, ns: &Namespace) -> Vec<CompletionItem> {
 
 fn setting_completions() -> Vec<CompletionItem> {
     let settings = [
-        ("Library", "Library    ${1:name}    ${2:WITH NAME}    ${3:alias}"),
+        (
+            "Library",
+            "Library    ${1:name}    ${2:WITH NAME}    ${3:alias}",
+        ),
         ("Resource", "Resource    ${1:path/to/resource.robot}"),
         ("Variables", "Variables    ${1:path/to/variables.yaml}"),
         ("Documentation", "Documentation    ${1:description}"),
@@ -274,10 +292,16 @@ mod tests {
         let src = "*** Test Cases ***\nMy Test\n    ";
         let file = parse(src);
         let ns = Namespace::new(None);
-        let pos = Position { line: 2, character: 4 };
+        let pos = Position {
+            line: 2,
+            character: 4,
+        };
         let items = completions(&file, &ns, pos);
         let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
-        assert!(labels.contains(&"Given "), "Should include 'Given ' BDD prefix");
+        assert!(
+            labels.contains(&"Given "),
+            "Should include 'Given ' BDD prefix"
+        );
     }
 
     #[test]
@@ -285,7 +309,10 @@ mod tests {
         let src = "*** Keywords ***\nMy Keyword\n    Log    hi\n*** Test Cases ***\nMy Test\n    ";
         let file = parse(src);
         let ns = Namespace::new(None);
-        let pos = Position { line: 5, character: 4 };
+        let pos = Position {
+            line: 5,
+            character: 4,
+        };
         let items = completions(&file, &ns, pos);
         assert!(items.iter().any(|i| i.label == "My Keyword"));
     }
@@ -295,7 +322,10 @@ mod tests {
         let src = "*** Variables ***\n${MY}    val\n";
         let file = parse(src);
         let ns = Namespace::new(None);
-        let pos = Position { line: 0, character: 0 };
+        let pos = Position {
+            line: 0,
+            character: 0,
+        };
         let items = completions(&file, &ns, pos);
         assert!(items.iter().any(|i| i.label == "${EMPTY}"));
     }

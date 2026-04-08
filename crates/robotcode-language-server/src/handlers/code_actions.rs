@@ -6,8 +6,8 @@
 //! - **Extract keyword** from selected body statements (refactoring)
 
 use lsp_types::{
-    CodeAction, CodeActionKind, CodeActionOrCommand, Diagnostic, NumberOrString, Position,
-    Range, TextEdit, Url, WorkspaceEdit,
+    CodeAction, CodeActionKind, CodeActionOrCommand, Diagnostic, NumberOrString, Position, Range,
+    TextEdit, Url, WorkspaceEdit,
 };
 use std::collections::HashMap;
 
@@ -79,7 +79,12 @@ fn extract_keyword_name_from_diagnostic(msg: &str) -> Option<String> {
     Some(msg[start + 1..end].to_string())
 }
 
-fn find_similar_keywords(ns: &Namespace, file: &File, name: &str, max_suggestions: usize) -> Vec<String> {
+fn find_similar_keywords(
+    ns: &Namespace,
+    file: &File,
+    name: &str,
+    max_suggestions: usize,
+) -> Vec<String> {
     let norm = normalize_keyword_name(name);
 
     // Collect all keyword names.
@@ -100,14 +105,21 @@ fn find_similar_keywords(ns: &Namespace, file: &File, name: &str, max_suggestion
         .collect();
     scored.sort_by_key(|(d, _)| *d);
     scored.dedup_by(|a, b| a.1 == b.1);
-    scored.into_iter().take(max_suggestions).map(|(_, n)| n).collect()
+    scored
+        .into_iter()
+        .take(max_suggestions)
+        .map(|(_, n)| n)
+        .collect()
 }
 
 fn make_text_replacement(uri: &Url, range: Range, new_text: &str) -> WorkspaceEdit {
     let mut changes: HashMap<Url, Vec<TextEdit>> = HashMap::new();
     changes.insert(
         uri.clone(),
-        vec![TextEdit { range, new_text: new_text.to_string() }],
+        vec![TextEdit {
+            range,
+            new_text: new_text.to_string(),
+        }],
     );
     WorkspaceEdit {
         changes: Some(changes),
@@ -142,11 +154,7 @@ fn levenshtein(a: &str, b: &str) -> usize {
 
 // ── Refactoring: Extract Keyword ──────────────────────────────────────────────
 
-fn extract_keyword_action(
-    file: &File,
-    uri: &Url,
-    range: Range,
-) -> Option<CodeActionOrCommand> {
+fn extract_keyword_action(file: &File, uri: &Url, range: Range) -> Option<CodeActionOrCommand> {
     // Find body items that overlap with `range`.
     let items = collect_items_in_range(file, range);
     if items.len() < 2 {
@@ -165,8 +173,14 @@ fn extract_keyword_action(
     // Find the Keywords section to insert into.
     let kw_insert_line = find_or_create_keywords_section_line(file);
     let insert_range = Range {
-        start: Position { line: kw_insert_line, character: 0 },
-        end: Position { line: kw_insert_line, character: 0 },
+        start: Position {
+            line: kw_insert_line,
+            character: 0,
+        },
+        end: Position {
+            line: kw_insert_line,
+            character: 0,
+        },
     };
 
     let mut changes: HashMap<Url, Vec<TextEdit>> = HashMap::new();
@@ -174,9 +188,15 @@ fn extract_keyword_action(
         uri.clone(),
         vec![
             // Replace selection with call.
-            TextEdit { range, new_text: call },
+            TextEdit {
+                range,
+                new_text: call,
+            },
             // Insert new keyword definition.
-            TextEdit { range: insert_range, new_text: new_kw },
+            TextEdit {
+                range: insert_range,
+                new_text: new_kw,
+            },
         ],
     );
 
@@ -184,7 +204,10 @@ fn extract_keyword_action(
         title: "Extract keyword".to_string(),
         kind: Some(CodeActionKind::REFACTOR_EXTRACT),
         diagnostics: None,
-        edit: Some(WorkspaceEdit { changes: Some(changes), ..Default::default() }),
+        edit: Some(WorkspaceEdit {
+            changes: Some(changes),
+            ..Default::default()
+        }),
         ..Default::default()
     }))
 }
@@ -239,13 +262,20 @@ fn find_or_create_keywords_section_line(file: &File) -> u32 {
     for section in &file.sections {
         if let Section::Keywords(s) = section {
             // Insert at end of existing Keywords section.
-            let end = s.body.last().map(|kw| {
-                kw.body.last().map(|item| match item {
-                    BodyItem::KeywordCall(kc) => kc.position.end_line,
-                    BodyItem::Comment(c) => c.position.end_line,
-                    _ => kw.position.end_line,
-                }).unwrap_or(kw.position.end_line)
-            }).unwrap_or(s.header.position.end_line);
+            let end = s
+                .body
+                .last()
+                .map(|kw| {
+                    kw.body
+                        .last()
+                        .map(|item| match item {
+                            BodyItem::KeywordCall(kc) => kc.position.end_line,
+                            BodyItem::Comment(c) => c.position.end_line,
+                            _ => kw.position.end_line,
+                        })
+                        .unwrap_or(kw.position.end_line)
+                })
+                .unwrap_or(s.header.position.end_line);
             return end + 1;
         }
     }
@@ -276,8 +306,14 @@ mod tests {
 
     fn empty_range() -> Range {
         Range {
-            start: Position { line: 0, character: 0 },
-            end: Position { line: 0, character: 0 },
+            start: Position {
+                line: 0,
+                character: 0,
+            },
+            end: Position {
+                line: 0,
+                character: 0,
+            },
         }
     }
 

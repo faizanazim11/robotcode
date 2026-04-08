@@ -8,14 +8,23 @@ use robotcode_rf_parser::parser::ast::{BodyItem, File, Section, VariableItem};
 use robotcode_rf_parser::variables::search_variable;
 use std::collections::HashMap;
 
-use super::utils::{ast_pos_to_range, position_in_ast};
+use super::utils::{ast_pos_to_range, position_in_ast, text_lines, token_cols};
 
 /// Rename the symbol at `pos` to `new_name`.
-pub fn rename(file: &File, uri: &Url, pos: Position, new_name: String) -> Option<WorkspaceEdit> {
+///
+/// `text` is the raw document source used to compute accurate argument column offsets.
+pub fn rename(
+    file: &File,
+    text: &str,
+    uri: &Url,
+    pos: Position,
+    new_name: String,
+) -> Option<WorkspaceEdit> {
+    let lines = text_lines(text);
     let token = token_at(file, pos)?;
     let edits = match &token {
         Token::Keyword(name) => keyword_rename_edits(file, name, &new_name),
-        Token::Variable(norm) => variable_rename_edits(file, norm, &new_name),
+        Token::Variable(norm) => variable_rename_edits(file, &lines, norm, &new_name),
     };
 
     if edits.is_empty() {
@@ -135,10 +144,19 @@ fn keyword_rename_edits(file: &File, old_name: &str, new_name: &str) -> Vec<Text
                     if kw.name == old_name {
                         // Rename the definition.
                         let range = lsp_types::Range {
-                            start: lsp_types::Position { line: kw.position.line, character: kw.position.column },
-                            end: lsp_types::Position { line: kw.position.line, character: kw.position.column + kw.name.len() as u32 },
+                            start: lsp_types::Position {
+                                line: kw.position.line,
+                                character: kw.position.column,
+                            },
+                            end: lsp_types::Position {
+                                line: kw.position.line,
+                                character: kw.position.column + kw.name.len() as u32,
+                            },
                         };
-                        edits.push(TextEdit { range, new_text: new_name.to_string() });
+                        edits.push(TextEdit {
+                            range,
+                            new_text: new_name.to_string(),
+                        });
                     }
                     collect_kw_call_edits(&kw.body, old_name, new_name, &mut edits);
                 }
@@ -160,16 +178,30 @@ fn keyword_rename_edits(file: &File, old_name: &str, new_name: &str) -> Vec<Text
     edits
 }
 
-fn collect_kw_call_edits(items: &[BodyItem], old_name: &str, new_name: &str, out: &mut Vec<TextEdit>) {
+fn collect_kw_call_edits(
+    items: &[BodyItem],
+    old_name: &str,
+    new_name: &str,
+    out: &mut Vec<TextEdit>,
+) {
     for item in items {
         match item {
             BodyItem::KeywordCall(kc) => {
                 if kc.name == old_name {
                     let range = lsp_types::Range {
-                        start: lsp_types::Position { line: kc.position.line, character: kc.position.column },
-                        end: lsp_types::Position { line: kc.position.line, character: kc.position.column + kc.name.len() as u32 },
+                        start: lsp_types::Position {
+                            line: kc.position.line,
+                            character: kc.position.column,
+                        },
+                        end: lsp_types::Position {
+                            line: kc.position.line,
+                            character: kc.position.column + kc.name.len() as u32,
+                        },
                     };
-                    out.push(TextEdit { range, new_text: new_name.to_string() });
+                    out.push(TextEdit {
+                        range,
+                        new_text: new_name.to_string(),
+                    });
                 }
             }
             BodyItem::For(f) => collect_kw_call_edits(&f.body, old_name, new_name, out),
@@ -191,7 +223,12 @@ fn collect_kw_call_edits(items: &[BodyItem], old_name: &str, new_name: &str, out
 
 // ── Variable rename ───────────────────────────────────────────────────────────
 
-fn variable_rename_edits(file: &File, norm_old: &str, new_name: &str) -> Vec<TextEdit> {
+fn variable_rename_edits(
+    file: &File,
+    lines: &[&str],
+    norm_old: &str,
+    new_name: &str,
+) -> Vec<TextEdit> {
     let mut edits = Vec::new();
 
     for section in &file.sections {
@@ -202,7 +239,11 @@ fn variable_rename_edits(file: &File, norm_old: &str, new_name: &str) -> Vec<Tex
                         if normalize_var_name(&v.name) == norm_old {
                             // Build the new variable name preserving the sigil.
                             let sigil = v.name.chars().next().unwrap_or('$');
-                            let new_var_name = format!("{}{{{}}}", sigil, new_name.trim_matches(['{', '}', '$', '@', '&', '%']));
+                            let new_var_name = format!(
+                                "{}{{{}}}",
+                                sigil,
+                                new_name.trim_matches(['{', '}', '$', '@', '&', '%'])
+                            );
                             let range = ast_pos_to_range(&v.position);
                             let name_range = lsp_types::Range {
                                 start: range.start,
@@ -211,24 +252,27 @@ fn variable_rename_edits(file: &File, norm_old: &str, new_name: &str) -> Vec<Tex
                                     character: range.start.character + v.name.len() as u32,
                                 },
                             };
-                            edits.push(TextEdit { range: name_range, new_text: new_var_name });
+                            edits.push(TextEdit {
+                                range: name_range,
+                                new_text: new_var_name,
+                            });
                         }
                     }
                 }
             }
             Section::TestCases(s) => {
                 for tc in &s.body {
-                    collect_var_edits_in_body(&tc.body, norm_old, new_name, &mut edits);
+                    collect_var_edits_in_body(&tc.body, lines, norm_old, new_name, &mut edits);
                 }
             }
             Section::Tasks(s) => {
                 for task in &s.body {
-                    collect_var_edits_in_body(&task.body, norm_old, new_name, &mut edits);
+                    collect_var_edits_in_body(&task.body, lines, norm_old, new_name, &mut edits);
                 }
             }
             Section::Keywords(s) => {
                 for kw in &s.body {
-                    collect_var_edits_in_body(&kw.body, norm_old, new_name, &mut edits);
+                    collect_var_edits_in_body(&kw.body, lines, norm_old, new_name, &mut edits);
                 }
             }
             _ => {}
@@ -238,24 +282,43 @@ fn variable_rename_edits(file: &File, norm_old: &str, new_name: &str) -> Vec<Tex
     edits
 }
 
-fn collect_var_edits_in_body(items: &[BodyItem], norm_old: &str, new_name: &str, out: &mut Vec<TextEdit>) {
+fn collect_var_edits_in_body(
+    items: &[BodyItem],
+    lines: &[&str],
+    norm_old: &str,
+    new_name: &str,
+    out: &mut Vec<TextEdit>,
+) {
     for item in items {
         match item {
             BodyItem::KeywordCall(kc) => {
-                for arg in &kc.args {
-                    collect_var_text_edits(arg, norm_old, new_name, kc.position.line, out);
+                let line_text = lines.get(kc.position.line as usize).copied().unwrap_or("");
+                let cols = token_cols(line_text);
+                let name_idx = kc.assigns.len();
+                for (i, arg) in kc.args.iter().enumerate() {
+                    let base_col = cols.get(name_idx + 1 + i).copied().unwrap_or(0);
+                    collect_var_text_edits(
+                        arg,
+                        norm_old,
+                        new_name,
+                        kc.position.line,
+                        base_col,
+                        out,
+                    );
                 }
             }
-            BodyItem::For(f) => collect_var_edits_in_body(&f.body, norm_old, new_name, out),
-            BodyItem::While(w) => collect_var_edits_in_body(&w.body, norm_old, new_name, out),
+            BodyItem::For(f) => collect_var_edits_in_body(&f.body, lines, norm_old, new_name, out),
+            BodyItem::While(w) => {
+                collect_var_edits_in_body(&w.body, lines, norm_old, new_name, out)
+            }
             BodyItem::If(iblk) => {
                 for branch in &iblk.branches {
-                    collect_var_edits_in_body(&branch.body, norm_old, new_name, out);
+                    collect_var_edits_in_body(&branch.body, lines, norm_old, new_name, out);
                 }
             }
             BodyItem::Try(tblk) => {
                 for branch in &tblk.branches {
-                    collect_var_edits_in_body(&branch.body, norm_old, new_name, out);
+                    collect_var_edits_in_body(&branch.body, lines, norm_old, new_name, out);
                 }
             }
             _ => {}
@@ -263,7 +326,14 @@ fn collect_var_edits_in_body(items: &[BodyItem], norm_old: &str, new_name: &str,
     }
 }
 
-fn collect_var_text_edits(text: &str, norm_old: &str, new_name: &str, line: u32, out: &mut Vec<TextEdit>) {
+fn collect_var_text_edits(
+    text: &str,
+    norm_old: &str,
+    new_name: &str,
+    line: u32,
+    base_col: u32,
+    out: &mut Vec<TextEdit>,
+) {
     let mut remaining = text;
     let mut offset: u32 = 0;
     while let Some(m) = search_variable(remaining) {
@@ -271,11 +341,21 @@ fn collect_var_text_edits(text: &str, norm_old: &str, new_name: &str, line: u32,
         if normalize_var_name(var_text) == norm_old {
             // Preserve the sigil.
             let sigil = var_text.chars().next().unwrap_or('$');
-            let new_var = format!("{}{{{}}}", sigil, new_name.trim_matches(['{', '}', '$', '@', '&', '%']));
+            let new_var = format!(
+                "{}{{{}}}",
+                sigil,
+                new_name.trim_matches(['{', '}', '$', '@', '&', '%'])
+            );
             out.push(TextEdit {
                 range: lsp_types::Range {
-                    start: lsp_types::Position { line, character: offset + m.start as u32 },
-                    end: lsp_types::Position { line, character: offset + m.end as u32 },
+                    start: lsp_types::Position {
+                        line,
+                        character: base_col + offset + m.start as u32,
+                    },
+                    end: lsp_types::Position {
+                        line,
+                        character: base_col + offset + m.end as u32,
+                    },
                 },
                 new_text: new_var,
             });
@@ -307,8 +387,11 @@ mod tests {
     fn test_rename_keyword_definition_and_calls() {
         let src = "*** Keywords ***\nMy Keyword\n    Log    hi\n*** Test Cases ***\nMy Test\n    My Keyword\n    My Keyword\n";
         let file = parse(src);
-        let pos = Position { line: 1, character: 0 };
-        let result = rename(&file, &test_uri(), pos, "My New Keyword".to_string());
+        let pos = Position {
+            line: 1,
+            character: 0,
+        };
+        let result = rename(&file, src, &test_uri(), pos, "My New Keyword".to_string());
         assert!(result.is_some());
         let edit = result.unwrap();
         let edits = edit.changes.unwrap().remove(&test_uri()).unwrap();
@@ -323,8 +406,11 @@ mod tests {
     fn test_rename_nothing_on_section_header() {
         let src = "*** Keywords ***\nMy Keyword\n    Log    hi\n";
         let file = parse(src);
-        let pos = Position { line: 0, character: 0 };
-        let result = rename(&file, &test_uri(), pos, "Irrelevant".to_string());
+        let pos = Position {
+            line: 0,
+            character: 0,
+        };
+        let result = rename(&file, src, &test_uri(), pos, "Irrelevant".to_string());
         assert!(result.is_none());
     }
 

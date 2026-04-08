@@ -81,7 +81,9 @@ impl RobotCodeServer {
 
     /// Return the current text for `uri` and its parsed AST.
     fn get_document_text(&self, uri: &Url) -> Option<Arc<String>> {
-        self.document_texts.get(uri.as_str()).map(|e| e.clone())
+        self.document_texts
+            .get(uri.as_str())
+            .map(|e| Arc::clone(e.value()))
     }
 }
 
@@ -96,15 +98,14 @@ impl LanguageServer for RobotCodeServer {
             "Received initialize request"
         );
 
-        let semantic_tokens_provider =
-            Some(SemanticTokensServerCapabilities::SemanticTokensOptions(
-                SemanticTokensOptions {
-                    work_done_progress_options: Default::default(),
-                    legend: legend(),
-                    range: Some(false),
-                    full: Some(SemanticTokensFullOptions::Bool(true)),
-                },
-            ));
+        let semantic_tokens_provider = Some(
+            SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions {
+                work_done_progress_options: Default::default(),
+                legend: legend(),
+                range: Some(false),
+                full: Some(SemanticTokensFullOptions::Bool(true)),
+            }),
+        );
 
         Ok(InitializeResult {
             capabilities: ServerCapabilities {
@@ -134,7 +135,7 @@ impl LanguageServer for RobotCodeServer {
                 }),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 signature_help_provider: Some(SignatureHelpOptions {
-                    trigger_characters: Some(vec!["    ".to_string()]),
+                    trigger_characters: Some(vec![" ".to_string()]),
                     retrigger_characters: None,
                     work_done_progress_options: Default::default(),
                 }),
@@ -232,7 +233,7 @@ impl LanguageServer for RobotCodeServer {
             return Ok(None);
         };
         let file = parse(&text);
-        let tokens = semantic_tokens(&file);
+        let tokens = semantic_tokens(&file, &text);
         Ok(Some(SemanticTokensResult::Tokens(tokens)))
     }
 
@@ -248,10 +249,7 @@ impl LanguageServer for RobotCodeServer {
         Ok(Some(DocumentSymbolResponse::Nested(symbols)))
     }
 
-    async fn folding_range(
-        &self,
-        params: FoldingRangeParams,
-    ) -> Result<Option<Vec<FoldingRange>>> {
+    async fn folding_range(&self, params: FoldingRangeParams) -> Result<Option<Vec<FoldingRange>>> {
         let Some(text) = self.get_document_text(&params.text_document.uri) else {
             return Ok(None);
         };
@@ -263,12 +261,16 @@ impl LanguageServer for RobotCodeServer {
         &self,
         params: DocumentHighlightParams,
     ) -> Result<Option<Vec<DocumentHighlight>>> {
-        let Some(text) = self.get_document_text(&params.text_document_position_params.text_document.uri) else {
+        let Some(text) =
+            self.get_document_text(&params.text_document_position_params.text_document.uri)
+        else {
             return Ok(None);
         };
         let file = parse(&text);
         let pos = params.text_document_position_params.position;
-        Ok(Some(handlers::highlight::document_highlight(&file, pos)))
+        Ok(Some(handlers::highlight::document_highlight(
+            &file, &text, pos,
+        )))
     }
 
     async fn selection_range(
@@ -285,10 +287,7 @@ impl LanguageServer for RobotCodeServer {
         )))
     }
 
-    async fn inlay_hint(
-        &self,
-        params: InlayHintParams,
-    ) -> Result<Option<Vec<InlayHint>>> {
+    async fn inlay_hint(&self, params: InlayHintParams) -> Result<Option<Vec<InlayHint>>> {
         let Some(text) = self.get_document_text(&params.text_document.uri) else {
             return Ok(None);
         };
@@ -317,10 +316,7 @@ impl LanguageServer for RobotCodeServer {
         Ok(handlers::goto::goto_definition(&file, &ns, uri, pos))
     }
 
-    async fn references(
-        &self,
-        params: ReferenceParams,
-    ) -> Result<Option<Vec<Location>>> {
+    async fn references(&self, params: ReferenceParams) -> Result<Option<Vec<Location>>> {
         let uri = &params.text_document_position.text_document.uri;
         let Some(text) = self.get_document_text(uri) else {
             return Ok(None);
@@ -328,21 +324,24 @@ impl LanguageServer for RobotCodeServer {
         let file = parse(&text);
         let pos = params.text_document_position.position;
         let include_decl = params.context.include_declaration;
-        let refs = handlers::references::references(&file, uri, pos, include_decl);
+        let refs = handlers::references::references(&file, &text, uri, pos, include_decl);
         Ok(if refs.is_empty() { None } else { Some(refs) })
     }
 
-    async fn rename(
-        &self,
-        params: RenameParams,
-    ) -> Result<Option<WorkspaceEdit>> {
+    async fn rename(&self, params: RenameParams) -> Result<Option<WorkspaceEdit>> {
         let uri = &params.text_document_position.text_document.uri;
         let Some(text) = self.get_document_text(uri) else {
             return Ok(None);
         };
         let file = parse(&text);
         let pos = params.text_document_position.position;
-        Ok(handlers::rename::rename(&file, uri, pos, params.new_name))
+        Ok(handlers::rename::rename(
+            &file,
+            &text,
+            uri,
+            pos,
+            params.new_name,
+        ))
     }
 
     async fn symbol(
@@ -368,10 +367,7 @@ impl LanguageServer for RobotCodeServer {
 
     // ── Phase 6: Completion & Hints ───────────────────────────────────────────
 
-    async fn completion(
-        &self,
-        params: CompletionParams,
-    ) -> Result<Option<CompletionResponse>> {
+    async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
         let uri = &params.text_document_position.text_document.uri;
         let Some(text) = self.get_document_text(uri) else {
             return Ok(None);
@@ -383,10 +379,7 @@ impl LanguageServer for RobotCodeServer {
         Ok(Some(CompletionResponse::Array(items)))
     }
 
-    async fn hover(
-        &self,
-        params: HoverParams,
-    ) -> Result<Option<Hover>> {
+    async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
         let uri = &params.text_document_position_params.text_document.uri;
         let Some(text) = self.get_document_text(uri) else {
             return Ok(None);
@@ -394,13 +387,10 @@ impl LanguageServer for RobotCodeServer {
         let file = parse(&text);
         let ns = Namespace::new(uri.to_file_path().ok());
         let pos = params.text_document_position_params.position;
-        Ok(handlers::hover::hover(&file, &ns, pos))
+        Ok(handlers::hover::hover(&file, &text, &ns, pos))
     }
 
-    async fn signature_help(
-        &self,
-        params: SignatureHelpParams,
-    ) -> Result<Option<SignatureHelp>> {
+    async fn signature_help(&self, params: SignatureHelpParams) -> Result<Option<SignatureHelp>> {
         let uri = &params.text_document_position_params.text_document.uri;
         let Some(text) = self.get_document_text(uri) else {
             return Ok(None);
@@ -413,10 +403,7 @@ impl LanguageServer for RobotCodeServer {
 
     // ── Phase 6: Code Actions & Formatting ───────────────────────────────────
 
-    async fn code_action(
-        &self,
-        params: CodeActionParams,
-    ) -> Result<Option<CodeActionResponse>> {
+    async fn code_action(&self, params: CodeActionParams) -> Result<Option<CodeActionResponse>> {
         let uri = &params.text_document.uri;
         let Some(text) = self.get_document_text(uri) else {
             return Ok(None);
@@ -430,26 +417,28 @@ impl LanguageServer for RobotCodeServer {
             params.range,
             params.context.diagnostics,
         );
-        Ok(if actions.is_empty() { None } else { Some(actions) })
+        Ok(if actions.is_empty() {
+            None
+        } else {
+            Some(actions)
+        })
     }
 
-    async fn code_lens(
-        &self,
-        params: CodeLensParams,
-    ) -> Result<Option<Vec<CodeLens>>> {
+    async fn code_lens(&self, params: CodeLensParams) -> Result<Option<Vec<CodeLens>>> {
         let uri = &params.text_document.uri;
         let Some(text) = self.get_document_text(uri) else {
             return Ok(None);
         };
         let file = parse(&text);
         let lenses = handlers::code_lens::code_lens(&file, uri);
-        Ok(if lenses.is_empty() { None } else { Some(lenses) })
+        Ok(if lenses.is_empty() {
+            None
+        } else {
+            Some(lenses)
+        })
     }
 
-    async fn formatting(
-        &self,
-        params: DocumentFormattingParams,
-    ) -> Result<Option<Vec<TextEdit>>> {
+    async fn formatting(&self, params: DocumentFormattingParams) -> Result<Option<Vec<TextEdit>>> {
         let uri = &params.text_document.uri;
         let Some(text) = self.get_document_text(uri) else {
             return Ok(None);
@@ -457,4 +446,3 @@ impl LanguageServer for RobotCodeServer {
         Ok(handlers::formatting::format_document(&text))
     }
 }
-

@@ -6,52 +6,52 @@
 
 use lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind, Position};
 use robotcode_rf_parser::parser::ast::{BodyItem, File, Section};
+use robotcode_rf_parser::variables::search_variable;
 use robotcode_robot::diagnostics::{entities::KeywordDoc, keyword_finder::KeywordMatch, Namespace};
 
-
+use super::utils::{text_lines, token_cols};
 
 /// Compute hover content for the token at `pos` in `file`.
-pub fn hover(file: &File, ns: &Namespace, pos: Position) -> Option<Hover> {
-    let token = token_at_position(file, pos)?;
+///
+/// `text` is the raw document source used to compute accurate argument column offsets
+/// so that variable references inside keyword-call arguments are detected correctly.
+pub fn hover(file: &File, text: &str, ns: &Namespace, pos: Position) -> Option<Hover> {
+    let lines = text_lines(text);
+    let token = token_at_position(file, &lines, pos)?;
     match token {
-        HoverToken::Keyword(name) => {
-            hover_for_keyword(ns, &name, file)
-        }
-        HoverToken::Variable(name) => {
-            hover_for_variable(&name, file)
-        }
+        HoverToken::Keyword(name) => hover_for_keyword(ns, &name, file),
+        HoverToken::Variable(name) => hover_for_variable(&name, file),
     }
 }
 
 // ── Token resolution ──────────────────────────────────────────────────────────
 
 #[derive(Debug)]
-#[allow(dead_code)]
 enum HoverToken {
     Keyword(String),
     Variable(String),
 }
 
-fn token_at_position(file: &File, pos: Position) -> Option<HoverToken> {
+fn token_at_position(file: &File, lines: &[&str], pos: Position) -> Option<HoverToken> {
     for section in &file.sections {
         match section {
             Section::TestCases(s) => {
                 for tc in &s.body {
-                    if let Some(t) = find_in_body(&tc.body, pos) {
+                    if let Some(t) = find_in_body(&tc.body, lines, pos) {
                         return Some(t);
                     }
                 }
             }
             Section::Tasks(s) => {
                 for task in &s.body {
-                    if let Some(t) = find_in_body(&task.body, pos) {
+                    if let Some(t) = find_in_body(&task.body, lines, pos) {
                         return Some(t);
                     }
                 }
             }
             Section::Keywords(s) => {
                 for kw in &s.body {
-                    if let Some(t) = find_in_body(&kw.body, pos) {
+                    if let Some(t) = find_in_body(&kw.body, lines, pos) {
                         return Some(t);
                     }
                 }
@@ -62,7 +62,7 @@ fn token_at_position(file: &File, pos: Position) -> Option<HoverToken> {
     None
 }
 
-fn find_in_body(items: &[BodyItem], pos: Position) -> Option<HoverToken> {
+fn find_in_body(items: &[BodyItem], lines: &[&str], pos: Position) -> Option<HoverToken> {
     for item in items {
         match item {
             BodyItem::KeywordCall(kc) => {
@@ -72,34 +72,66 @@ fn find_in_body(items: &[BodyItem], pos: Position) -> Option<HoverToken> {
                     if pos.character >= name_col && pos.character <= name_end {
                         return Some(HoverToken::Keyword(kc.name.clone()));
                     }
+                    // Check variable references inside arguments using accurate columns.
+                    let line_text = lines.get(kc.position.line as usize).copied().unwrap_or("");
+                    let cols = token_cols(line_text);
+                    let name_idx = kc.assigns.len();
+                    for (i, arg) in kc.args.iter().enumerate() {
+                        let base_col = cols.get(name_idx + 1 + i).copied().unwrap_or(0);
+                        if let Some(var_name) = var_at_position(arg, pos, base_col) {
+                            return Some(HoverToken::Variable(var_name));
+                        }
+                    }
                 }
             }
             BodyItem::For(f) => {
-                if let Some(t) = find_in_body(&f.body, pos) {
+                if let Some(t) = find_in_body(&f.body, lines, pos) {
                     return Some(t);
                 }
             }
             BodyItem::While(w) => {
-                if let Some(t) = find_in_body(&w.body, pos) {
+                if let Some(t) = find_in_body(&w.body, lines, pos) {
                     return Some(t);
                 }
             }
             BodyItem::If(iblk) => {
                 for branch in &iblk.branches {
-                    if let Some(t) = find_in_body(&branch.body, pos) {
+                    if let Some(t) = find_in_body(&branch.body, lines, pos) {
                         return Some(t);
                     }
                 }
             }
             BodyItem::Try(tblk) => {
                 for branch in &tblk.branches {
-                    if let Some(t) = find_in_body(&branch.body, pos) {
+                    if let Some(t) = find_in_body(&branch.body, lines, pos) {
                         return Some(t);
                     }
                 }
             }
             _ => {}
         }
+    }
+    None
+}
+
+/// Return the normalized variable name if `pos` falls on a variable reference in `text`.
+///
+/// `base_col` is the document-line column where `text` starts.
+fn var_at_position(text: &str, pos: Position, base_col: u32) -> Option<String> {
+    let mut remaining = text;
+    let mut offset: u32 = 0;
+    while let Some(m) = search_variable(remaining) {
+        let start_char = base_col + offset + m.start as u32;
+        let end_char = base_col + offset + m.end as u32;
+        if pos.character >= start_char && pos.character <= end_char {
+            let var_text = &remaining[m.start..m.end];
+            return Some(var_text.to_string());
+        }
+        if m.end >= remaining.len() {
+            break;
+        }
+        offset += m.end as u32;
+        remaining = &remaining[m.end..];
     }
     None
 }
@@ -169,13 +201,17 @@ fn build_keyword_hover(kw: &KeywordDoc) -> Hover {
 
 fn format_local_keyword_signature(kw: &robotcode_rf_parser::parser::ast::Keyword) -> String {
     // Extract [Arguments] from the keyword body.
-    let args: Vec<String> = kw.body.iter().find_map(|item| {
-        if let BodyItem::Arguments(a) = item {
-            Some(a.args.iter().map(|s| format!("*{}*", s)).collect())
-        } else {
-            None
-        }
-    }).unwrap_or_default();
+    let args: Vec<String> = kw
+        .body
+        .iter()
+        .find_map(|item| {
+            if let BodyItem::Arguments(a) = item {
+                Some(a.args.iter().map(|s| format!("*{}*", s)).collect())
+            } else {
+                None
+            }
+        })
+        .unwrap_or_default();
 
     let mut md = format!("**{}**", kw.name);
     if !args.is_empty() {
@@ -246,8 +282,11 @@ mod tests {
         let src = "*** Test Cases ***\nMy Test\n    My Keyword\n*** Keywords ***\nMy Keyword\n    [Documentation]    Does something useful\n    Log    hi\n";
         let file = parse(src);
         let ns = Namespace::new(None);
-        let pos = Position { line: 2, character: 4 };
-        let result = hover(&file, &ns, pos);
+        let pos = Position {
+            line: 2,
+            character: 4,
+        };
+        let result = hover(&file, src, &ns, pos);
         assert!(result.is_some());
         if let Some(h) = result {
             if let HoverContents::Markup(mc) = h.contents {
@@ -261,8 +300,11 @@ mod tests {
         let src = "*** Keywords ***\nMy Keyword\n    Log    hi\n";
         let file = parse(src);
         let ns = Namespace::new(None);
-        let pos = Position { line: 0, character: 0 };
-        let result = hover(&file, &ns, pos);
+        let pos = Position {
+            line: 0,
+            character: 0,
+        };
+        let result = hover(&file, src, &ns, pos);
         assert!(result.is_none());
     }
 }

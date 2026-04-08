@@ -23,7 +23,7 @@ fn selection_range_for(file: &File, pos: Position) -> SelectionRange {
     for section in &file.sections {
         match section {
             Section::Settings(s) => {
-                if position_in_ast(pos, &s.header.position) || pos.line >= s.header.position.line {
+                if position_in_ast(pos, &s.header.position) {
                     return SelectionRange {
                         range: ast_pos_to_range(&s.header.position),
                         parent: None,
@@ -201,18 +201,27 @@ mod tests {
     fn test_selection_range_on_keyword_call() {
         let src = "*** Test Cases ***\nMy Test\n    Log    hi\n";
         let file = parse(src);
-        let pos = Position { line: 2, character: 4 };
+        let pos = Position {
+            line: 2,
+            character: 4,
+        };
         let ranges = selection_ranges(&file, vec![pos]);
         assert_eq!(ranges.len(), 1);
         // Should have at least one parent (the test case).
-        assert!(ranges[0].parent.is_some(), "Keyword call should have a parent range");
+        assert!(
+            ranges[0].parent.is_some(),
+            "Keyword call should have a parent range"
+        );
     }
 
     #[test]
     fn test_selection_range_on_block_name() {
         let src = "*** Test Cases ***\nMy Test\n    Log    hi\n";
         let file = parse(src);
-        let pos = Position { line: 1, character: 0 };
+        let pos = Position {
+            line: 1,
+            character: 0,
+        };
         let ranges = selection_ranges(&file, vec![pos]);
         assert_eq!(ranges.len(), 1);
         assert_eq!(ranges[0].range.start.line, 1);
@@ -222,7 +231,10 @@ mod tests {
     fn test_selection_range_fallback_on_unknown_pos() {
         let src = "*** Keywords ***\nMy Keyword\n    Log    hi\n";
         let file = parse(src);
-        let pos = Position { line: 999, character: 0 }; // Outside file
+        let pos = Position {
+            line: 999,
+            character: 0,
+        }; // Outside file
         let ranges = selection_ranges(&file, vec![pos]);
         assert_eq!(ranges.len(), 1);
         // Should return a fallback zero-width range at the position.

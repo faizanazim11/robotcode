@@ -128,13 +128,17 @@ fn resolve_arg_names(ns: &Namespace, file: &File, kw_name: &str) -> Vec<String> 
         if let Section::Keywords(s) = section {
             for kw in &s.body {
                 if kw.name == kw_name {
-                    return kw.body.iter().find_map(|item| {
-                        if let BodyItem::Arguments(a) = item {
-                            Some(a.args.clone())
-                        } else {
-                            None
-                        }
-                    }).unwrap_or_default();
+                    return kw
+                        .body
+                        .iter()
+                        .find_map(|item| {
+                            if let BodyItem::Arguments(a) = item {
+                                Some(a.args.clone())
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or_default();
                 }
             }
         }
@@ -150,8 +154,14 @@ mod tests {
 
     fn full_range() -> Range {
         Range {
-            start: Position { line: 0, character: 0 },
-            end: Position { line: 9999, character: 9999 },
+            start: Position {
+                line: 0,
+                character: 0,
+            },
+            end: Position {
+                line: 9999,
+                character: 9999,
+            },
         }
     }
 
@@ -163,10 +173,20 @@ mod tests {
         let hints = inlay_hints(&file, &ns, full_range());
         // Should emit hints for "name:" and "value:" arguments.
         assert!(!hints.is_empty(), "Should have at least one inlay hint");
-        let labels: Vec<String> = hints.iter().filter_map(|h| {
-            if let InlayHintLabel::String(s) = &h.label { Some(s.clone()) } else { None }
-        }).collect();
-        assert!(labels.iter().any(|l| l.contains("name:")), "Should hint 'name:'");
+        let labels: Vec<String> = hints
+            .iter()
+            .filter_map(|h| {
+                if let InlayHintLabel::String(s) = &h.label {
+                    Some(s.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert!(
+            labels.iter().any(|l| l.contains("name:")),
+            "Should hint 'name:'"
+        );
     }
 
     #[test]

@@ -19,15 +19,21 @@ pub fn format_document(text: &str) -> Option<Vec<TextEdit>> {
     }
 
     // Return a single edit that replaces the whole document.
-    let line_count = text.lines().count() as u32;
-    let last_line_len = text.lines().last().map(|l| l.len() as u32).unwrap_or(0);
+    // Split by '\n' (not .lines()) so trailing newlines produce a trailing empty element,
+    // giving us the correct LSP one-past-the-end position.
+    let raw_lines: Vec<&str> = text.split('\n').collect();
+    let end_line = raw_lines.len().saturating_sub(1) as u32;
+    let end_char = raw_lines.last().map(|l| l.len() as u32).unwrap_or(0);
 
     Some(vec![TextEdit {
         range: lsp_types::Range {
-            start: lsp_types::Position { line: 0, character: 0 },
+            start: lsp_types::Position {
+                line: 0,
+                character: 0,
+            },
             end: lsp_types::Position {
-                line: line_count,
-                character: last_line_len,
+                line: end_line,
+                character: end_char,
             },
         },
         new_text: formatted,
@@ -65,11 +71,13 @@ pub fn format_rf(text: &str) -> String {
             let rest = trimmed;
 
             if indent == 0 {
-                // Block name (test case name, keyword name) — no indent.
+                // Block name (test case name, keyword name) or unindented Settings row.
                 if prev_was_block_end && !output.ends_with("\n\n") {
                     output.push('\n');
                 }
-                output.push_str(rest);
+                // Normalize separators even for unindented lines (e.g. `Library  Collections`).
+                let normalized = normalize_separators(rest);
+                output.push_str(&normalized);
                 output.push('\n');
                 prev_was_block_end = false;
             } else {
@@ -158,7 +166,10 @@ mod tests {
     fn test_format_normalizes_header() {
         let src = "***Settings***\nLibrary    Collections\n";
         let result = format_rf(src);
-        assert!(result.contains("*** Settings ***"), "Header should be normalized");
+        assert!(
+            result.contains("*** Settings ***"),
+            "Header should be normalized"
+        );
     }
 
     #[test]
@@ -166,7 +177,10 @@ mod tests {
         let src = "*** Keywords ***\nMy Keyword\n    Log  hello  world\n";
         let result = format_rf(src);
         // "Log  hello  world" → "Log    hello    world"
-        assert!(result.contains("Log    hello"), "Should normalize separators to 4 spaces");
+        assert!(
+            result.contains("Log    hello"),
+            "Should normalize separators to 4 spaces"
+        );
     }
 
     #[test]
@@ -180,7 +194,10 @@ mod tests {
     fn test_format_collapses_blank_lines() {
         let src = "*** Keywords ***\nMy Keyword\n    Log    hi\n\n\n\n*** Test Cases ***\n";
         let result = format_rf(src);
-        assert!(!result.contains("\n\n\n"), "Should not have 3+ consecutive blank lines");
+        assert!(
+            !result.contains("\n\n\n"),
+            "Should not have 3+ consecutive blank lines"
+        );
     }
 
     #[test]
@@ -193,7 +210,10 @@ mod tests {
 
     #[test]
     fn test_split_separators() {
-        assert_eq!(split_rf_separators("Log    hello    world"), vec!["Log", "hello", "world"]);
+        assert_eq!(
+            split_rf_separators("Log    hello    world"),
+            vec!["Log", "hello", "world"]
+        );
         assert_eq!(split_rf_separators("Log  hi"), vec!["Log", "hi"]);
         assert_eq!(split_rf_separators("Log\thi"), vec!["Log", "hi"]);
         assert_eq!(split_rf_separators("Single"), vec!["Single"]);
