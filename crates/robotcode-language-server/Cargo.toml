@@ -12,5 +12,8 @@ robotcode-jsonrpc2 = { path = "../robotcode-jsonrpc2" }
 robotcode-rf-parser = { path = "../robotcode-rf-parser" }
 robotcode-robot = { path = "../robotcode-robot" }
 robotcode-python-bridge = { path = "../robotcode-python-bridge" }
+dashmap.workspace = true
+lsp-types.workspace = true
+serde_json.workspace = true
 tokio.workspace = true
 tracing.workspace = true
