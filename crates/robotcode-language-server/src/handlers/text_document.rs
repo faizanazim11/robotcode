@@ -5,7 +5,7 @@ use robotcode_jsonrpc2::Client;
 use tracing::{debug, info};
 
 /// Handle `textDocument/didOpen`.
-pub async fn did_open(client: &Client, params: DidOpenTextDocumentParams) {
+pub async fn did_open(client: &Client, params: &DidOpenTextDocumentParams) {
     let doc = &params.text_document;
     info!(
         uri = %doc.uri,
@@ -19,7 +19,7 @@ pub async fn did_open(client: &Client, params: DidOpenTextDocumentParams) {
 }
 
 /// Handle `textDocument/didChange`.
-pub async fn did_change(client: &Client, params: DidChangeTextDocumentParams) {
+pub async fn did_change(client: &Client, params: &DidChangeTextDocumentParams) {
     let uri = &params.text_document.uri;
     let version = params.text_document.version;
     debug!(
@@ -37,7 +37,7 @@ pub async fn did_change(client: &Client, params: DidChangeTextDocumentParams) {
 }
 
 /// Handle `textDocument/didClose`.
-pub async fn did_close(client: &Client, params: DidCloseTextDocumentParams) {
+pub async fn did_close(client: &Client, params: &DidCloseTextDocumentParams) {
     let uri = &params.text_document.uri;
     info!(%uri, "Document closed");
     client
@@ -46,7 +46,7 @@ pub async fn did_close(client: &Client, params: DidCloseTextDocumentParams) {
 }
 
 /// Handle `textDocument/didSave`.
-pub async fn did_save(client: &Client, params: DidSaveTextDocumentParams) {
+pub async fn did_save(client: &Client, params: &DidSaveTextDocumentParams) {
     let uri = &params.text_document.uri;
     info!(%uri, "Document saved");
     client

@@ -8,6 +8,8 @@ description = "Robot Framework analysis engine for RobotCode"
 
 [dependencies]
 robotcode-python-bridge = { path = "../robotcode-python-bridge" }
+robotcode-rf-parser = { path = "../robotcode-rf-parser" }
+lsp-types.workspace = true
 tokio.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -15,6 +17,8 @@ tracing.workspace = true
 thiserror.workspace = true
 anyhow.workspace = true
 dashmap.workspace = true
+regex.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
+tempfile.workspace = true
