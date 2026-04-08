@@ -141,6 +141,12 @@ fun Project.buildRobotCodeCommandLine(
     // Pass --python <interpreter> so the bridge can find Robot Framework.
     if (rustBinary != null) {
         val pythonInterpreter = this.robotPythonSdk?.homePath
+        if (pythonInterpreter == null) {
+            thisLogger().warn(
+                "Rust binary used for project '${this.name}' but no Python SDK is configured. " +
+                "Robot Framework libraries will not be resolved until a Python environment is set."
+            )
+        }
         val pythonArgs = if (pythonInterpreter != null) arrayOf("--python", pythonInterpreter) else arrayOf()
         return GeneralCommandLine(
             rustBinary.pathString,

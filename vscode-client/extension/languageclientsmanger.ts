@@ -518,6 +518,12 @@ export class LanguageClientsManager {
     const rustBinary = this.pythonManager.rustBinaryPath;
     if (rustBinary) {
       const pythonCommand = await this.pythonManager.getPythonCommand(folder);
+      if (!pythonCommand) {
+        this.outputChannel.appendLine(
+          `[WARN] Rust language server: no Python interpreter found for workspace '${folder.name}'. ` +
+            `Robot Framework libraries will not be resolved until a Python environment is configured.`,
+        );
+      }
       const pythonArgs = pythonCommand ? ["--python", pythonCommand] : [];
       this.outputChannel.appendLine(`Using Rust language server binary: ${rustBinary}`);
       return {

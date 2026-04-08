@@ -144,9 +144,15 @@ impl ServerState {
         debug!(keyword = %keyword, "evaluate");
 
         // Build a subprocess bridge pointing to the configured Python interpreter.
-        // The helper.py is resolved relative to the binary using the standard
-        // bundled layout: <install>/bundled/libs/python_bridge/helper.py.
-        // Fall back to the path known at compile time for development builds.
+        // Resolve the helper.py script from the standard bundled layout.
+        // Expected layouts:
+        //   Production (installed extension):
+        //     <extension-root>/bundled/bin/robotcode        (the binary itself)
+        //     <extension-root>/bundled/libs/python_bridge/helper.py
+        //   The binary sits at <extension-root>/bundled/bin/, so two parents up
+        //   from current_exe() gives <extension-root>/.
+        //   Development (cargo run from repo root):
+        //     Falls back to "python-bridge/helper.py" relative to CWD.
         let python_exe = self
             .python
             .clone()
@@ -155,13 +161,13 @@ impl ServerState {
         let helper_path = std::env::current_exe()
             .ok()
             .and_then(|exe| {
-                // <install>/bin/robotcode -> <install>/bundled/libs/python_bridge/helper.py
-                exe.parent().and_then(|p| p.parent()).map(|base| {
-                    base.join("bundled")
-                        .join("libs")
-                        .join("python_bridge")
-                        .join("helper.py")
-                })
+                // <extension-root>/bundled/bin/robotcode
+                //   -> exe.parent()  = <extension-root>/bundled/bin
+                //   -> .parent()     = <extension-root>/bundled
+                //   -> .join("libs/python_bridge/helper.py")
+                exe.parent()
+                    .and_then(|bin_dir| bin_dir.parent())
+                    .map(|bundled| bundled.join("libs").join("python_bridge").join("helper.py"))
             })
             .filter(|p| p.exists())
             .unwrap_or_else(|| PathBuf::from("python-bridge/helper.py"));
