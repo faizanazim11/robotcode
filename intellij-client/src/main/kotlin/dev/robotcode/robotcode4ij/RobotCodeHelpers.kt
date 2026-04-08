@@ -138,7 +138,10 @@ fun Project.buildRobotCodeCommandLine(
     val rustBinary = RobotCodeHelpers.rustBinaryPath
 
     // When the Rust binary is available, use it directly.
-    // Pass --python <interpreter> so the bridge can find Robot Framework.
+    // The `args` array already starts with the subcommand name (e.g. "language-server").
+    // `--python` is a subcommand-level flag and must follow the subcommand.
+    // Python-launcher-only global flags (--format, --no-color, --no-pager, -p) are
+    // intentionally not passed — the Rust CLI does not implement them.
     if (rustBinary != null) {
         val pythonInterpreter = this.robotPythonSdk?.homePath
         if (pythonInterpreter == null) {
@@ -150,13 +153,8 @@ fun Project.buildRobotCodeCommandLine(
         val pythonArgs = if (pythonInterpreter != null) arrayOf("--python", pythonInterpreter) else arrayOf()
         return GeneralCommandLine(
             rustBinary.pathString,
-            *(if (format.isNotEmpty()) arrayOf("--format", format) else arrayOf()),
-            *(if (noColor) arrayOf("--no-color") else arrayOf()),
-            *(if (noPager) arrayOf("--no-pager") else arrayOf()),
-            *profiles.flatMap { listOf("-p", it) }.toTypedArray(),
-            *extraArgs,
-            *pythonArgs,
-            *args
+            *args,       // ["language-server", "--socket", "6610"] — subcommand first
+            *pythonArgs  // ["--python", "/usr/bin/python3"] — subcommand flag last
         ).withWorkDirectory(this.basePath).withCharset(Charsets.UTF_8)
     }
 

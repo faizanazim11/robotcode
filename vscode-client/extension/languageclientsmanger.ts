@@ -524,12 +524,15 @@ export class LanguageClientsManager {
             `Robot Framework libraries will not be resolved until a Python environment is configured.`,
         );
       }
+      // Rust CLI: robotcode language-server [--stdio|--tcp PORT] [--python PATH]
+      // Subcommand must be first; --python is a subcommand-level flag.
       const pythonArgs = pythonCommand ? ["--python", pythonCommand] : [];
+      const rustExtraArgs = config.get<string[]>("languageServer.extraArgs", []);
       this.outputChannel.appendLine(`Using Rust language server binary: ${rustBinary}`);
       return {
         run: {
           command: rustBinary,
-          args: [...profiles, ...pythonArgs, ...serverArgs],
+          args: ["language-server", ...rustExtraArgs, ...pythonArgs],
           options: { cwd: folder.uri.fsPath },
           transport:
             transport !== TransportKind.socket
@@ -538,7 +541,7 @@ export class LanguageClientsManager {
         },
         debug: {
           command: rustBinary,
-          args: [...debug_args, ...profiles, ...pythonArgs, ...serverArgs],
+          args: ["language-server", ...rustExtraArgs, ...pythonArgs],
           options: { cwd: folder.uri.fsPath },
           transport:
             transport !== TransportKind.socket

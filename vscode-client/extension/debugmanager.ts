@@ -320,7 +320,7 @@ class RobotCodeDebugAdapterDescriptorFactory implements vscode.DebugAdapterDescr
     session: vscode.DebugSession,
     config: vscode.WorkspaceConfiguration,
     launchArgs: string[],
-  ) {
+  ): Promise<cp.ChildProcess> {
     let robotcodeExtraArgs = config.get<string[]>("extraArgs", []);
 
     if (session.configuration.launcherArgs) {
@@ -332,33 +332,44 @@ class RobotCodeDebugAdapterDescriptorFactory implements vscode.DebugAdapterDescr
       env: {},
     };
 
+    const spawnAndWait = (cmd: string, args: string[]): Promise<cp.ChildProcess> =>
+      new Promise<cp.ChildProcess>((resolve, reject) => {
+        const p = cp.spawn(cmd, args, options);
+        p.stdout?.on("data", (data) => {
+          this.outputChannel.append(`${data as string}`);
+        });
+        p.stderr?.on("data", (data) => {
+          this.outputChannel.append(`${data as string}`);
+        });
+        p.on("error", (e) => {
+          reject(new Error(`Failed to start debug launcher: ${e.message}`));
+        });
+        p.on("spawn", () => {
+          resolve(p);
+        });
+        p.on("close", (code, signal) => {
+          if (code !== 0) {
+            this.outputChannel.appendLine(
+              `debug launcher exited with code ${code ?? "unknown"} and signal ${signal ?? "unknown"}`,
+            );
+          }
+        });
+      });
+
     // Prefer the bundled Rust binary; fall back to the Python-based launcher.
     const rustBinary = this.pythonManager.rustBinaryPath;
     if (rustBinary) {
       const pythonCommand = await this.pythonManager.getPythonCommand(session.workspaceFolder);
       const pythonArgs = pythonCommand ? ["--python", pythonCommand] : [];
-      const args: string[] = [...robotcodeExtraArgs, ...pythonArgs, ...launchArgs];
+
+      // Map Python's "debug-launch" subcommand to the Rust binary's "debug".
+      // Rust CLI expects: robotcode debug [--stdio|--tcp PORT] [--pipe-server PATH]
+      const [launchSubcommand, ...launchSubcommandArgs] = launchArgs;
+      const rustSubcommand = launchSubcommand === "debug-launch" ? "debug" : launchSubcommand;
+      const args: string[] = [rustSubcommand, ...robotcodeExtraArgs, ...launchSubcommandArgs, ...pythonArgs];
 
       this.outputChannel.appendLine(`Starting debug launcher with Rust binary: ${rustBinary} ${args.join(" ")}`);
-
-      const p = cp.spawn(rustBinary, args, options);
-      p.stdout?.on("data", (data) => {
-        this.outputChannel.append(`${data as string}`);
-      });
-      p.stderr?.on("data", (data) => {
-        this.outputChannel.append(`${data as string}`);
-      });
-      p.on("error", (e) => {
-        throw new Error(`Failed to start debug launcher: ${e.message}`);
-      });
-      p.on("close", (code, signal) => {
-        if (code !== 0) {
-          this.outputChannel.appendLine(
-            `debug launcher exited with code ${code ?? "unknown"} and signal ${signal ?? "unknown"}`,
-          );
-        }
-      });
-      return p;
+      return spawnAndWait(rustBinary, args);
     }
 
     const pythonCommand = await this.pythonManager.getPythonCommand(session.workspaceFolder);
@@ -370,26 +381,7 @@ class RobotCodeDebugAdapterDescriptorFactory implements vscode.DebugAdapterDescr
     const args: string[] = ["-u", this.pythonManager.robotCodeMain, ...robotcodeExtraArgs, ...launchArgs];
 
     this.outputChannel.appendLine(`Starting debug launcher with command: ${pythonCommand} ${args.join(" ")}`);
-
-    const p = cp.spawn(pythonCommand, args, options);
-    p.stdout?.on("data", (data) => {
-      this.outputChannel.append(`${data as string}`);
-    });
-    p.stderr?.on("data", (data) => {
-      this.outputChannel.append(`${data as string}`);
-    });
-    p.on("error", (e) => {
-      throw new Error(`Failed to start debug launcher: ${e.message}`);
-    });
-    p.on("close", (code, signal) => {
-      if (code !== 0) {
-        this.outputChannel.appendLine(
-          `debug launcher exited with code ${code ?? "unknown"} and signal ${signal ?? "unknown"}`,
-        );
-      }
-    });
-
-    return p;
+    return spawnAndWait(pythonCommand, args);
   }
 }
 

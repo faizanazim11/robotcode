@@ -100,11 +100,16 @@ impl ServerState {
     }
 
     /// Handle a single JSON-RPC request and return the response value.
+    ///
+    /// Errors carry the JSON-RPC error code alongside the message:
+    /// - `-32601` Method not found
+    /// - `-32602` Invalid params
+    /// - `-32603` Internal error
     async fn handle(
         &self,
         method: &str,
         params: Option<Value>,
-    ) -> std::result::Result<Value, String> {
+    ) -> std::result::Result<Value, (i32, String)> {
         match method {
             "evaluate" => self.handle_evaluate(params).await,
             "history" => Ok(json!(self.history.entries())),
@@ -114,11 +119,14 @@ impl ServerState {
             }
             "complete" => self.handle_complete(params),
             "shutdown" => Ok(json!({})),
-            unknown => Err(format!("Method not found: {unknown}")),
+            unknown => Err((-32601, format!("Method not found: {unknown}"))),
         }
     }
 
-    async fn handle_evaluate(&self, params: Option<Value>) -> std::result::Result<Value, String> {
+    async fn handle_evaluate(
+        &self,
+        params: Option<Value>,
+    ) -> std::result::Result<Value, (i32, String)> {
         let params = params.unwrap_or_default();
 
         let keyword = params
@@ -128,7 +136,7 @@ impl ServerState {
             .to_owned();
 
         if keyword.is_empty() {
-            return Err("'keyword' parameter is required".into());
+            return Err((-32602, "'keyword' parameter is required".into()));
         }
 
         let variables: HashMap<String, String> = params
@@ -185,12 +193,12 @@ impl ServerState {
             }
             Err(e) => {
                 self.history.push(keyword, None, true);
-                Err(e.to_string())
+                Err((-32603, e.to_string()))
             }
         }
     }
 
-    fn handle_complete(&self, params: Option<Value>) -> std::result::Result<Value, String> {
+    fn handle_complete(&self, params: Option<Value>) -> std::result::Result<Value, (i32, String)> {
         let prefix = params
             .as_ref()
             .and_then(|v| v.get("prefix"))
@@ -256,38 +264,53 @@ where
 
         debug!(line = %line, "received line");
 
-        let response = match serde_json::from_str::<Request>(&line) {
+        // Per JSON-RPC 2.0: a request without an `id` is a *notification* —
+        // the server executes it but MUST NOT send a response.
+        let response: Option<Response> = match serde_json::from_str::<Request>(&line) {
             Err(e) => {
                 warn!(error = %e, "invalid JSON-RPC request");
-                Response::error(None, -32700, format!("Parse error: {e}"))
+                Some(Response::error(None, -32700, format!("Parse error: {e}")))
             }
             Ok(req) => {
+                let is_notification = req.id.is_none();
                 let id = req.id.clone();
                 match state.handle(&req.method, req.params).await {
                     Ok(result) => {
                         if req.method == "shutdown" {
-                            let resp = Response::success(id, result);
-                            let mut line = serde_json::to_string(&resp)?;
-                            line.push('\n');
-                            writer.write_all(line.as_bytes()).await?;
-                            writer.flush().await?;
+                            if !is_notification {
+                                let resp = Response::success(id, result);
+                                let mut line = serde_json::to_string(&resp)?;
+                                line.push('\n');
+                                writer.write_all(line.as_bytes()).await?;
+                                writer.flush().await?;
+                            }
                             info!("REPL server shutdown");
                             return Ok(());
                         }
-                        Response::success(id, result)
+                        if is_notification {
+                            None
+                        } else {
+                            Some(Response::success(id, result))
+                        }
                     }
-                    Err(msg) => {
-                        error!(method = %req.method, error = %msg, "handler error");
-                        Response::error(id, -32603, msg)
+                    Err((code, msg)) => {
+                        error!(method = %req.method, code, error = %msg, "handler error");
+                        if is_notification {
+                            None
+                        } else {
+                            Some(Response::error(id, code, msg))
+                        }
                     }
                 }
             }
         };
 
-        let mut out = serde_json::to_string(&response)?;
-        out.push('\n');
-        writer.write_all(out.as_bytes()).await?;
-        writer.flush().await?;
+        if let Some(resp) = response {
+            let mut out = serde_json::to_string(&resp)?;
+            out.push('\n');
+            writer.write_all(out.as_bytes()).await?;
+            writer.flush().await?;
+        }
     }
 
     info!("REPL server input stream closed");
@@ -369,6 +392,41 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn method_not_found_returns_32601() {
+        let state = Arc::new(ServerState::new(ReplConfig::default()));
+        let err = state.handle("no_such_method", None).await.unwrap_err();
+        assert_eq!(err.0, -32601);
+    }
+
+    #[tokio::test]
+    async fn invalid_params_returns_32602() {
+        let state = Arc::new(ServerState::new(ReplConfig::default()));
+        // evaluate with empty keyword should return -32602 Invalid params.
+        let err = state
+            .handle("evaluate", Some(json!({"keyword": ""})))
+            .await
+            .unwrap_err();
+        assert_eq!(err.0, -32602);
+    }
+
+    #[tokio::test]
+    async fn notification_produces_no_response() {
+        // A request without "id" is a notification; no response should be sent.
+        let responses = roundtrip(&[
+            // notification (no id)
+            r#"{"jsonrpc":"2.0","method":"history/clear","params":{}}"#,
+            // regular request to verify server is still alive
+            r#"{"jsonrpc":"2.0","id":1,"method":"history","params":{}}"#,
+            r#"{"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}"#,
+        ])
+        .await;
+        // Only the two requests with an id should produce responses.
+        assert_eq!(responses.len(), 2);
+        assert_eq!(responses[0]["id"], json!(1));
+        assert_eq!(responses[1]["id"], json!(2));
+    }
+
+    #[tokio::test]
     async fn parse_error_returns_rpc_error() {
         let responses = roundtrip(&[
             "not json",
@@ -376,5 +434,6 @@ mod tests {
         ])
         .await;
         assert!(responses[0].get("error").is_some());
+        assert_eq!(responses[0]["error"]["code"], json!(-32700));
     }
 }

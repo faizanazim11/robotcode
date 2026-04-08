@@ -4,13 +4,17 @@
 //! bounded by a configurable maximum capacity. Entries are kept in
 //! insertion order; the most recent entry is last.
 
+use std::collections::VecDeque;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Mutex;
+
 /// Maximum number of history entries retained by default.
 const DEFAULT_CAPACITY: usize = 500;
 
 /// A single history entry recording one REPL evaluation.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct HistoryEntry {
-    /// Sequential entry number (1-based).
+    /// Monotonically increasing entry number (1-based, never resets on eviction).
     pub index: usize,
     /// The expression / keyword call that was evaluated.
     pub expression: String,
@@ -23,35 +27,39 @@ pub struct HistoryEntry {
 /// Thread-safe REPL history store.
 #[derive(Debug)]
 pub struct History {
-    entries: std::sync::Mutex<Vec<HistoryEntry>>,
+    entries: Mutex<VecDeque<HistoryEntry>>,
     capacity: usize,
+    /// Monotonic counter; never decremented even when entries are evicted.
+    next_index: AtomicUsize,
 }
 
 impl History {
     /// Create a new history store with the default capacity.
     pub fn new() -> Self {
         Self {
-            entries: std::sync::Mutex::new(Vec::new()),
+            entries: Mutex::new(VecDeque::new()),
             capacity: DEFAULT_CAPACITY,
+            next_index: AtomicUsize::new(1),
         }
     }
 
     /// Create a new history store with a custom capacity.
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            entries: std::sync::Mutex::new(Vec::new()),
+            entries: Mutex::new(VecDeque::new()),
             capacity,
+            next_index: AtomicUsize::new(1),
         }
     }
 
-    /// Append a new entry. Returns the assigned index.
+    /// Append a new entry. Returns the assigned (monotonic) index.
     pub fn push(&self, expression: String, result: Option<String>, error: bool) -> usize {
+        let index = self.next_index.fetch_add(1, Ordering::Relaxed);
         let mut entries = self.entries.lock().expect("history mutex poisoned");
-        let index = entries.len() + 1;
         if entries.len() >= self.capacity {
-            entries.remove(0);
+            entries.pop_front();
         }
-        entries.push(HistoryEntry {
+        entries.push_back(HistoryEntry {
             index,
             expression,
             result,
@@ -62,10 +70,15 @@ impl History {
 
     /// Return a snapshot of all history entries.
     pub fn entries(&self) -> Vec<HistoryEntry> {
-        self.entries.lock().expect("history mutex poisoned").clone()
+        self.entries
+            .lock()
+            .expect("history mutex poisoned")
+            .iter()
+            .cloned()
+            .collect()
     }
 
-    /// Clear all history entries.
+    /// Clear all history entries (the monotonic counter is preserved).
     pub fn clear(&self) {
         self.entries.lock().expect("history mutex poisoned").clear();
     }
@@ -106,6 +119,22 @@ mod tests {
         assert_eq!(entries.len(), 3);
         assert_eq!(entries[0].expression, "kw2");
         assert_eq!(entries[2].expression, "kw4");
+    }
+
+    #[test]
+    fn monotonic_index_after_eviction() {
+        // Indexes must keep incrementing even after entries are evicted.
+        let h = History::with_capacity(2);
+        let i1 = h.push("kw1".into(), None, false);
+        let i2 = h.push("kw2".into(), None, false);
+        let i3 = h.push("kw3".into(), None, false); // evicts kw1
+        assert_eq!(i1, 1);
+        assert_eq!(i2, 2);
+        assert_eq!(i3, 3);
+        let entries = h.entries();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].index, 2);
+        assert_eq!(entries[1].index, 3);
     }
 
     #[test]

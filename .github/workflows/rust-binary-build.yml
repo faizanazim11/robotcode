@@ -58,7 +58,7 @@ jobs:
 
       - name: Install cross (for cross-compilation)
         if: matrix.cross == true
-        run: cargo install cross --git https://github.com/cross-rs/cross
+        run: cargo install cross --version 0.2.5 --locked
 
       - name: Cache cargo registry and build artifacts
         uses: actions/cache@v4
