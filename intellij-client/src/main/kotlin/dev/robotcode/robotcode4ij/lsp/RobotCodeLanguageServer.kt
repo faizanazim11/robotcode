@@ -24,6 +24,13 @@ class RobotCodeLanguageServer(private val project: Project) : OSProcessStreamCon
         commandLine = buildCommandLine()
     }
     
+    /**
+     * Build the server command line.
+     *
+     * When the bundled Rust binary is present, [buildRobotCodeCommandLine]
+     * will use it directly and pass `--python <interpreter>` for the bridge.
+     * Otherwise it falls back to the Python-based launcher.
+     */
     private fun buildCommandLine(port: Int = 6610): GeneralCommandLine {
         return project.buildRobotCodeCommandLine(arrayOf("language-server", "--socket", "$port"))
     }

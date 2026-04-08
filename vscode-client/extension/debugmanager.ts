@@ -321,12 +321,6 @@ class RobotCodeDebugAdapterDescriptorFactory implements vscode.DebugAdapterDescr
     config: vscode.WorkspaceConfiguration,
     launchArgs: string[],
   ) {
-    const pythonCommand = await this.pythonManager.getPythonCommand(session.workspaceFolder);
-
-    if (pythonCommand === undefined) {
-      throw new Error("Can't get a valid python command.");
-    }
-
     let robotcodeExtraArgs = config.get<string[]>("extraArgs", []);
 
     if (session.configuration.launcherArgs) {
@@ -337,6 +331,41 @@ class RobotCodeDebugAdapterDescriptorFactory implements vscode.DebugAdapterDescr
       cwd: session.workspaceFolder?.uri.fsPath,
       env: {},
     };
+
+    // Prefer the bundled Rust binary; fall back to the Python-based launcher.
+    const rustBinary = this.pythonManager.rustBinaryPath;
+    if (rustBinary) {
+      const pythonCommand = await this.pythonManager.getPythonCommand(session.workspaceFolder);
+      const pythonArgs = pythonCommand ? ["--python", pythonCommand] : [];
+      const args: string[] = [...robotcodeExtraArgs, ...pythonArgs, ...launchArgs];
+
+      this.outputChannel.appendLine(`Starting debug launcher with Rust binary: ${rustBinary} ${args.join(" ")}`);
+
+      const p = cp.spawn(rustBinary, args, options);
+      p.stdout?.on("data", (data) => {
+        this.outputChannel.append(`${data as string}`);
+      });
+      p.stderr?.on("data", (data) => {
+        this.outputChannel.append(`${data as string}`);
+      });
+      p.on("error", (e) => {
+        throw new Error(`Failed to start debug launcher: ${e.message}`);
+      });
+      p.on("close", (code, signal) => {
+        if (code !== 0) {
+          this.outputChannel.appendLine(
+            `debug launcher exited with code ${code ?? "unknown"} and signal ${signal ?? "unknown"}`,
+          );
+        }
+      });
+      return p;
+    }
+
+    const pythonCommand = await this.pythonManager.getPythonCommand(session.workspaceFolder);
+
+    if (pythonCommand === undefined) {
+      throw new Error("Can't get a valid python command.");
+    }
 
     const args: string[] = ["-u", this.pythonManager.robotCodeMain, ...robotcodeExtraArgs, ...launchArgs];
 

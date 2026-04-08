@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from "child_process";
+import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 import { CONFIG_SECTION } from "./config";
@@ -36,6 +37,17 @@ export class PythonManager {
     return this._pythonVersionScript;
   }
 
+  /**
+   * Absolute path to the platform-specific Rust `robotcode` binary bundled
+   * with the extension, or `undefined` if it has not been bundled yet.
+   *
+   * Layout: `bundled/bin/robotcode` (Linux/macOS) or
+   *         `bundled/bin/robotcode.exe` (Windows).
+   */
+  public get rustBinaryPath(): string | undefined {
+    return this._rustBinaryPath;
+  }
+
   private readonly _onActivePythonEnvironmentChangedEmitter =
     new vscode.EventEmitter<ActivePythonEnvironmentChangedEvent>();
   public get onActivePythonEnvironmentChanged(): vscode.Event<ActivePythonEnvironmentChangedEvent> {
@@ -46,6 +58,7 @@ export class PythonManager {
   _checkRobotVersionMain: string;
   _robotCodeMain: string;
   _pythonVersionScript = "import sys; print(sys.version_info[:2]>=(3,8))";
+  _rustBinaryPath: string | undefined;
 
   _pythonExtension: PythonExtension | undefined;
   private _disposables: vscode.Disposable | undefined;
@@ -63,6 +76,13 @@ export class PythonManager {
     );
 
     this._robotCodeMain = this.extensionContext.asAbsolutePath(path.join("bundled", "tool", "robotcode"));
+
+    // Prefer the bundled Rust binary when available.
+    const binaryName = process.platform === "win32" ? "robotcode.exe" : "robotcode";
+    const candidate = this.extensionContext.asAbsolutePath(path.join("bundled", "bin", binaryName));
+    if (fs.existsSync(candidate)) {
+      this._rustBinaryPath = candidate;
+    }
   }
 
   dispose(): void {

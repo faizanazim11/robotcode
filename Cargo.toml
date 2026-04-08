@@ -9,6 +9,7 @@ members = [
     "crates/robotcode-runner",
     "crates/robotcode-analyze",
     "crates/robotcode-debugger",
+    "crates/robotcode-repl",
     "crates/robotcode",
 ]
 resolver = "2"

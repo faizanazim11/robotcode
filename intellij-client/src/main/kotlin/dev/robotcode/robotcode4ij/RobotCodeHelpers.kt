@@ -32,6 +32,20 @@ class RobotCodeHelpers {
         val toolPath: Path = bundledPath.resolve("tool")
         val robotCodePath: Path = toolPath.resolve("robotcode")
         val checkRobotVersion: Path = toolPath.resolve("utils").resolve("check_robot_version.py")
+
+        /**
+         * Path to the bundled Rust `robotcode` binary, or `null` when the binary
+         * has not been included in the plugin distribution yet.
+         *
+         * Layout: `bundled/bin/robotcode` (Linux/macOS) or
+         *         `bundled/bin/robotcode.exe` (Windows).
+         */
+        val rustBinaryPath: Path? by lazy {
+            val binaryName = if (System.getProperty("os.name", "").lowercase().contains("windows"))
+                "robotcode.exe" else "robotcode"
+            val candidate = bundledPath.resolve("bin").resolve(binaryName)
+            if (candidate.exists() && candidate.isRegularFile()) candidate else null
+        }
         
         val PYTHON_AND_ROBOT_OK_KEY = Key.create<CheckPythonAndRobotVersionResult?>("ROBOTCODE_PYTHON_AND_ROBOT_OK")
     }
@@ -121,6 +135,26 @@ fun Project.buildRobotCodeCommandLine(
     noColor: Boolean = true,
     noPager: Boolean = true
 ): GeneralCommandLine {
+    val rustBinary = RobotCodeHelpers.rustBinaryPath
+
+    // When the Rust binary is available, use it directly.
+    // Pass --python <interpreter> so the bridge can find Robot Framework.
+    if (rustBinary != null) {
+        val pythonInterpreter = this.robotPythonSdk?.homePath
+        val pythonArgs = if (pythonInterpreter != null) arrayOf("--python", pythonInterpreter) else arrayOf()
+        return GeneralCommandLine(
+            rustBinary.pathString,
+            *(if (format.isNotEmpty()) arrayOf("--format", format) else arrayOf()),
+            *(if (noColor) arrayOf("--no-color") else arrayOf()),
+            *(if (noPager) arrayOf("--no-pager") else arrayOf()),
+            *profiles.flatMap { listOf("-p", it) }.toTypedArray(),
+            *extraArgs,
+            *pythonArgs,
+            *args
+        ).withWorkDirectory(this.basePath).withCharset(Charsets.UTF_8)
+    }
+
+    // Fall back to the Python-based launcher.
     if (this.checkPythonAndRobotVersion() != CheckPythonAndRobotVersionResult.OK) {
         throw InvalidPythonOrRobotVersionException("PythonSDK is not defined or robot version is not valid for project ${this.name}")
     }

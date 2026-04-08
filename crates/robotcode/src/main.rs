@@ -9,6 +9,7 @@ use robotcode_analyze::analyze::{AnalyzeArgs, OutputFormat};
 use robotcode_debugger::server::DapServer;
 use robotcode_jsonrpc2::{LspService, Server, Transport};
 use robotcode_language_server::RobotCodeServer;
+use robotcode_repl::server::{serve_stdio, serve_tcp, ReplConfig};
 use robotcode_runner::{
     discover::DiscoverArgs, libdoc::LibdocArgs, rebot::RebotArgs, run::RunArgs,
     testdoc::TestdocArgs,
@@ -41,6 +42,8 @@ enum Commands {
     Discover(DiscoverCliArgs),
     /// Run batch static analysis on Robot Framework files.
     Analyze(AnalyzeCliArgs),
+    /// Start the interactive REPL server for Robot Framework keyword evaluation.
+    Repl(ReplCliArgs),
 }
 
 // ── language-server ───────────────────────────────────────────────────────────
@@ -185,6 +188,24 @@ struct AnalyzeCliArgs {
     paths: Vec<PathBuf>,
 }
 
+// ── repl ──────────────────────────────────────────────────────────────────────
+
+/// Arguments for the `repl` subcommand.
+#[derive(Debug, Parser)]
+struct ReplCliArgs {
+    /// Use stdio transport (default).
+    #[arg(long, conflicts_with = "tcp")]
+    stdio: bool,
+
+    /// Listen for a REPL client on TCP PORT.
+    #[arg(long, value_name = "PORT", conflicts_with = "stdio")]
+    tcp: Option<u16>,
+
+    /// Path to the Python interpreter used for keyword evaluation.
+    #[arg(long, value_name = "PATH")]
+    python: Option<PathBuf>,
+}
+
 // ── main ──────────────────────────────────────────────────────────────────────
 
 #[tokio::main]
@@ -312,6 +333,17 @@ async fn main() -> Result<()> {
             let exit_code = report.exit_code;
             if exit_code != 0 {
                 std::process::exit(exit_code);
+            }
+        }
+
+        Commands::Repl(args) => {
+            let config = ReplConfig {
+                python: args.python,
+            };
+            if let Some(port) = args.tcp {
+                serve_tcp(port, config).await?;
+            } else {
+                serve_stdio(config).await?;
             }
         }
     }
