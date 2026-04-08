@@ -38,7 +38,7 @@ pub struct DiscoveredKeyword {
 pub struct DiscoveredSuite {
     /// Suite name derived from the file name.
     pub name: String,
-    /// Absolute path to the source file.
+    /// Path to the source file (canonicalized when possible).
     pub source: PathBuf,
     /// Tests/tasks found in the file.
     pub tests: Vec<DiscoveredTest>,
@@ -128,9 +128,10 @@ fn walk_directory(dir: &Path, recursive: bool) -> Result<Vec<DiscoveredSuite>> {
         if !child_suites.is_empty() {
             // Represent the directory as a container suite with no direct tests.
             let dir_name = suite_name_from_path(sub_dir);
+            let dir_source = sub_dir.canonicalize().unwrap_or_else(|_| sub_dir.clone());
             suites.push(DiscoveredSuite {
                 name: dir_name,
-                source: sub_dir.clone(),
+                source: dir_source,
                 tests: Vec::new(),
                 suites: child_suites,
                 keywords: Vec::new(),
@@ -165,7 +166,8 @@ fn parse_file(path: &Path) -> Option<DiscoveredSuite> {
                 for tc in &tc_section.body {
                     tests.push(DiscoveredTest {
                         name: tc.name.clone(),
-                        line: tc.position.line,
+                        // Parser positions are 0-indexed; add 1 for 1-based line numbers.
+                        line: tc.position.line + 1,
                         tags: extract_tags_from_body(&tc.body),
                     });
                 }
@@ -174,7 +176,8 @@ fn parse_file(path: &Path) -> Option<DiscoveredSuite> {
                 for task in &task_section.body {
                     tests.push(DiscoveredTest {
                         name: task.name.clone(),
-                        line: task.position.line,
+                        // Parser positions are 0-indexed; add 1 for 1-based line numbers.
+                        line: task.position.line + 1,
                         tags: extract_tags_from_body(&task.body),
                     });
                 }
@@ -183,7 +186,8 @@ fn parse_file(path: &Path) -> Option<DiscoveredSuite> {
                 for kw in &kw_section.body {
                     keywords.push(DiscoveredKeyword {
                         name: kw.name.clone(),
-                        line: kw.position.line,
+                        // Parser positions are 0-indexed; add 1 for 1-based line numbers.
+                        line: kw.position.line + 1,
                     });
                 }
             }
@@ -192,10 +196,12 @@ fn parse_file(path: &Path) -> Option<DiscoveredSuite> {
     }
 
     let name = suite_name_from_path(path);
+    // Canonicalize so callers receive a consistent, absolute path.
+    let source = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
 
     Some(DiscoveredSuite {
         name,
-        source: path.to_path_buf(),
+        source,
         tests,
         suites: Vec::new(),
         keywords,

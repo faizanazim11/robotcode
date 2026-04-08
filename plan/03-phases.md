@@ -275,15 +275,16 @@ The Rust AST does not need to be a 1:1 mirror of Robot Framework's Python AST �
 - [x] `crates/robotcode-debugger/dap_types.rs` — DAP 1.51 type model
 - [x] `crates/robotcode-debugger/server.rs` — DAP stdio/TCP server
 - [x] `crates/robotcode-debugger/protocol.rs` — DAP message dispatcher
-- [x] `crates/robotcode-debugger/debugger.rs`:
-  - [x] Launch RF in Python subprocess with debug listener injected
-  - [x] Breakpoint setting (line breakpoints, conditional breakpoints)
-  - [x] Step over / step into / step out
-  - [x] Stack frame inspection
-  - [x] Variable inspection (RF variables, Python local variables)
-  - [x] Exception breakpoints (on RF failures)
-  - [x] Pause / continue / disconnect
-  - [x] Output events (test log → DAP OutputEvent)
+- [x] `crates/robotcode-debugger/debugger.rs` (initial stub — full implementation in Phase 8):
+  - [x] Launch RF in Python subprocess (basic `python -m robot` spawn)
+  - [x] Breakpoint setting (line breakpoints, conditional breakpoints — stored, not yet signalled to RF)
+  - [x] Step over / step into / step out (stub responses)
+  - [x] Stack frame inspection (stub — populated when adapter enters Stopped state)
+  - [x] Variable inspection (stub — empty variable list)
+  - [x] Exception breakpoints (accepted; not yet forwarded to RF)
+  - [x] Pause / continue / disconnect (state transitions implemented)
+  - [ ] Output events (test log → DAP OutputEvent) — planned for Phase 8
+  - [ ] RF debug listener injection — planned for Phase 8
 - [x] `crates/robotcode-debugger/launcher.rs` — Launch configuration (attach, launch modes)
 
 #### CLI Tools
@@ -299,7 +300,9 @@ The Rust AST does not need to be a 1:1 mirror of Robot Framework's Python AST �
 - [x] Final `clap` CLI with all subcommands registered
 
 ### Success Criteria
-- Debug session can set breakpoints, step through RF test execution ✅
+- DAP server infrastructure (type model, framing, server, state machine) in place ✅
+- Debug session launch, breakpoint setting, and lifecycle commands functional ✅
+- Full RF listener injection and real-time stopped/variable events planned for Phase 8
 - `robotcode discover` output matches Python implementation on all test suites ✅
 - `robotcode analyze` exit codes match Python implementation ✅
 

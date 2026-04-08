@@ -79,8 +79,16 @@ impl DapServer {
             let message = match DapProtocol::read_message(reader).await {
                 Ok(m) => m,
                 Err(e) => {
-                    let msg = e.to_string();
-                    if msg.contains("Connection closed") || msg.contains("unexpected end") {
+                    // Detect clean disconnection: either an UnexpectedEof from
+                    // tokio I/O, or the explicit sentinel from DapProtocol when
+                    // the read loop finds n == 0.
+                    let is_eof = e
+                        .downcast_ref::<std::io::Error>()
+                        .map(|ie| ie.kind() == std::io::ErrorKind::UnexpectedEof)
+                        .unwrap_or(false)
+                        || e.to_string()
+                            .contains("Connection closed while reading DAP headers");
+                    if is_eof {
                         info!("DAP client disconnected");
                         return Ok(());
                     }

@@ -285,8 +285,9 @@ impl RfDebugger {
                 id: 0,
                 name: "Robot Framework Execution".to_owned(),
                 source: None,
-                line: 0,
-                column: 0,
+                // DAP uses 1-based line and column numbers.
+                line: 1,
+                column: 1,
             }]
         } else {
             vec![]
@@ -402,19 +403,28 @@ impl RfDebugger {
         &mut self,
         arguments: Option<&serde_json::Value>,
     ) -> Result<Option<serde_json::Value>> {
+        use crate::dap_types::DisconnectArguments;
+
         debug!("DAP disconnect");
 
+        // Deserialize via the typed struct so that serde's `rename_all = "camelCase"`
+        // correctly maps `terminateDebuggee` (DAP spec) → `terminate_debuggee`.
         let terminate = arguments
-            .and_then(|a| a.get("terminateDebugee").and_then(|v| v.as_bool()))
+            .and_then(|a| serde_json::from_value::<DisconnectArguments>(a.clone()).ok())
+            .map(|da| da.terminate_debuggee)
             .unwrap_or(true);
 
-        if terminate {
-            if let Some(child) = &mut self.process {
+        if let Some(mut child) = self.process.take() {
+            if terminate {
                 let _ = child.start_kill();
             }
+            // Spawn a background task to wait for the child so it is properly
+            // reaped and does not become a zombie process.
+            tokio::spawn(async move {
+                let _ = child.wait().await;
+            });
         }
 
-        self.process = None;
         self.state = DebuggerState::Terminated;
 
         Ok(Some(serde_json::to_value(EmptyBody {})?))

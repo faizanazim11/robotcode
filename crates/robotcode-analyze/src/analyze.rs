@@ -42,7 +42,7 @@ pub struct AnalyzeArgs {
 /// Per-file diagnostics.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileDiagnostics {
-    /// Absolute path to the analyzed file.
+    /// Path to the analyzed file (canonicalized when possible).
     pub path: PathBuf,
     /// Diagnostics found in this file.
     pub diagnostics: Vec<Diagnostic>,
@@ -59,7 +59,9 @@ pub struct AnalysisReport {
     pub warnings: usize,
     /// All per-file diagnostics.
     pub diagnostics: Vec<FileDiagnostics>,
-    /// Suggested exit code: 0 = ok, 1 = errors, 2 = warnings-only.
+    /// Suggested CLI exit code: `0` means no configured failure condition was
+    /// triggered; `1` means errors were found and `fail_on_error` is enabled;
+    /// `2` means only warnings were found and `fail_on_warning` is enabled.
     pub exit_code: i32,
 }
 
@@ -74,8 +76,10 @@ pub async fn analyze(args: AnalyzeArgs) -> Result<AnalysisReport> {
     for path in &files {
         debug!(path = %path.display(), "Analyzing file");
         let diags = analyze_file(path);
+        // Canonicalize the path so callers receive a consistent, absolute path.
+        let canonical = path.canonicalize().unwrap_or_else(|_| path.clone());
         file_diagnostics.push(FileDiagnostics {
-            path: path.clone(),
+            path: canonical,
             diagnostics: diags,
         });
     }
@@ -172,6 +176,7 @@ fn collect_ast_diagnostics(file: &ast::File) -> Vec<Diagnostic> {
     for section in &file.sections {
         if let ast::Section::Invalid(invalid) = section {
             for err in &invalid.body {
+                // Parser positions are 0-indexed; pass through as-is for LSP.
                 diags.push(make_error_diagnostic(&err.message, err.position.line));
             }
         }
@@ -180,18 +185,14 @@ fn collect_ast_diagnostics(file: &ast::File) -> Vec<Diagnostic> {
     diags
 }
 
+/// Build a parse-error [`Diagnostic`] at the given 0-indexed `line`.
 fn make_error_diagnostic(message: &str, line: u32) -> Diagnostic {
     use lsp_types::{Position, Range};
+    // LSP positions are 0-indexed; use the same line for both start and end.
     Diagnostic {
         range: Range {
-            start: Position {
-                line: line.saturating_sub(1),
-                character: 0,
-            },
-            end: Position {
-                line: line.saturating_sub(1),
-                character: u32::MAX,
-            },
+            start: Position { line, character: 0 },
+            end: Position { line, character: 0 },
         },
         severity: Some(DiagnosticSeverity::ERROR),
         message: message.to_owned(),

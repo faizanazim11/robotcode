@@ -2,7 +2,6 @@
 
 use robotcode_analyze::analyze::{analyze, AnalyzeArgs, OutputFormat};
 use std::io::Write;
-use std::path::PathBuf;
 
 #[tokio::test]
 async fn analyze_empty_paths_returns_zero_files() {
