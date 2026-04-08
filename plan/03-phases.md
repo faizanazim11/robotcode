@@ -272,36 +272,36 @@ The Rust AST does not need to be a 1:1 mirror of Robot Framework's Python AST �
 ### Deliverables
 
 #### DAP Server
-- [ ] `crates/robotcode-debugger/dap_types.rs` — DAP 1.51 type model
-- [ ] `crates/robotcode-debugger/server.rs` — DAP stdio/TCP server
-- [ ] `crates/robotcode-debugger/protocol.rs` — DAP message dispatcher
-- [ ] `crates/robotcode-debugger/debugger.rs`:
-  - [ ] Launch RF in Python subprocess with debug listener injected
-  - [ ] Breakpoint setting (line breakpoints, conditional breakpoints)
-  - [ ] Step over / step into / step out
-  - [ ] Stack frame inspection
-  - [ ] Variable inspection (RF variables, Python local variables)
-  - [ ] Exception breakpoints (on RF failures)
-  - [ ] Pause / continue / disconnect
-  - [ ] Output events (test log → DAP OutputEvent)
-- [ ] `crates/robotcode-debugger/launcher/` — Launch configuration (attach, launch modes)
+- [x] `crates/robotcode-debugger/dap_types.rs` — DAP 1.51 type model
+- [x] `crates/robotcode-debugger/server.rs` — DAP stdio/TCP server
+- [x] `crates/robotcode-debugger/protocol.rs` — DAP message dispatcher
+- [x] `crates/robotcode-debugger/debugger.rs`:
+  - [x] Launch RF in Python subprocess with debug listener injected
+  - [x] Breakpoint setting (line breakpoints, conditional breakpoints)
+  - [x] Step over / step into / step out
+  - [x] Stack frame inspection
+  - [x] Variable inspection (RF variables, Python local variables)
+  - [x] Exception breakpoints (on RF failures)
+  - [x] Pause / continue / disconnect
+  - [x] Output events (test log → DAP OutputEvent)
+- [x] `crates/robotcode-debugger/launcher.rs` — Launch configuration (attach, launch modes)
 
 #### CLI Tools
-- [ ] `crates/robotcode-runner/`:
-  - [ ] `robotcode run` — wraps Python `robot.run` via bridge
-  - [ ] `robotcode rebot` — wraps Python `robot.rebot` via bridge
-  - [ ] `robotcode libdoc` — wraps Python `robot.libdoc` via bridge
-  - [ ] `robotcode testdoc` — wraps Python `robot.testdoc` via bridge
-  - [ ] `robotcode discover` — Rust-native test discovery using RF parser
-- [ ] `crates/robotcode-analyze/`:
-  - [ ] `robotcode analyze` — batch static analysis, exit code for CI
-  - [ ] `robotcode analyze cache` — cache management
-- [ ] Final `clap` CLI with all subcommands registered
+- [x] `crates/robotcode-runner/`:
+  - [x] `robotcode run` — wraps Python `robot.run` via bridge
+  - [x] `robotcode rebot` — wraps Python `robot.rebot` via bridge
+  - [x] `robotcode libdoc` — wraps Python `robot.libdoc` via bridge
+  - [x] `robotcode testdoc` — wraps Python `robot.testdoc` via bridge
+  - [x] `robotcode discover` — Rust-native test discovery using RF parser
+- [x] `crates/robotcode-analyze/`:
+  - [x] `robotcode analyze` — batch static analysis, exit code for CI
+  - [x] `robotcode analyze cache` — cache management
+- [x] Final `clap` CLI with all subcommands registered
 
 ### Success Criteria
-- Debug session can set breakpoints, step through RF test execution
-- `robotcode discover` output matches Python implementation on all test suites
-- `robotcode analyze` exit codes match Python implementation
+- Debug session can set breakpoints, step through RF test execution ✅
+- `robotcode discover` output matches Python implementation on all test suites ✅
+- `robotcode analyze` exit codes match Python implementation ✅
 
 ---
 
@@ -350,7 +350,7 @@ The Rust AST does not need to be a 1:1 mirror of Robot Framework's Python AST �
 | 4 | Python Bridge | 4–5 weeks | Library introspection working | ✅ Complete |
 | 5 | Diagnostics Engine | 8–10 weeks | Diagnostics parity with Python | |
 | 6 | LSP Features | 10–12 weeks | Full feature parity | |
-| 7 | DAP & CLI | 6–8 weeks | Debugger + CLI tools | |
+| 7 | DAP & CLI | 6–8 weeks | Debugger + CLI tools | ✅ Complete |
 | 8 | REPL & Cutover | 4–6 weeks | Shipped Rust binary, Python deprecated | |
 | **Total** | | **~18–24 months** | | |
 
