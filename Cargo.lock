@@ -937,11 +937,14 @@ dependencies = [
 name = "robotcode-language-server"
 version = "0.1.0"
 dependencies = [
+ "dashmap 6.1.0",
+ "lsp-types",
  "robotcode-core",
  "robotcode-jsonrpc2",
  "robotcode-python-bridge",
  "robotcode-rf-parser",
  "robotcode-robot",
+ "serde_json",
  "tokio",
  "tracing",
 ]
