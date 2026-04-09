@@ -903,6 +903,7 @@ dependencies = [
  "robotcode-debugger",
  "robotcode-jsonrpc2",
  "robotcode-language-server",
+ "robotcode-repl",
  "robotcode-runner",
  "serde_json",
  "tokio",
@@ -986,6 +987,19 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "dashmap 6.1.0",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "robotcode-repl"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "robotcode-python-bridge",
  "serde",
  "serde_json",
  "thiserror",

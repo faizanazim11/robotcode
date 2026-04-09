@@ -503,19 +503,9 @@ export class LanguageClientsManager {
   private async getServerOptions(folder: vscode.WorkspaceFolder, mode: string): Promise<ServerOptions | undefined> {
     const config = vscode.workspace.getConfiguration(CONFIG_SECTION, folder);
 
-    try {
-      if (!(await this.isValidRobotEnvironmentInFolder(folder, true))) return undefined;
-    } catch {
-      return undefined;
-    }
-    const pythonCommand = await this.pythonManager.getPythonCommand(folder);
-    if (!pythonCommand) return undefined;
-
     const robotCodeExtraArgs = config.get<string[]>("languageServer.extraArgs", []);
-
-    const args: string[] = ["-u", "-X", "utf8", this.pythonManager.robotCodeMain];
+    const profiles = config.get<string[]>("profiles", []).flatMap((v) => ["-p", v]);
     const serverArgs: string[] = [...robotCodeExtraArgs, "language-server"];
-
     const debug_args: string[] = ["--log"];
 
     const transport = { stdio: TransportKind.stdio, pipe: TransportKind.pipe, socket: TransportKind.socket }[mode];
@@ -524,7 +514,53 @@ export class LanguageClientsManager {
       return getAvailablePort(["127.0.0.1"]);
     };
 
-    const profiles = config.get<string[]>("profiles", []).flatMap((v) => ["-p", v]);
+    // Prefer the bundled Rust binary; fall back to the Python-based launcher.
+    const rustBinary = this.pythonManager.rustBinaryPath;
+    if (rustBinary) {
+      const pythonCommand = await this.pythonManager.getPythonCommand(folder);
+      if (!pythonCommand) {
+        this.outputChannel.appendLine(
+          `[WARN] Rust language server: no Python interpreter found for workspace '${folder.name}'. ` +
+            `Robot Framework libraries will not be resolved until a Python environment is configured.`,
+        );
+      }
+      // Rust CLI: robotcode language-server [--stdio|--tcp PORT] [--python PATH]
+      // Subcommand must be first; --python is a subcommand-level flag.
+      const pythonArgs = pythonCommand ? ["--python", pythonCommand] : [];
+      const rustExtraArgs = config.get<string[]>("languageServer.extraArgs", []);
+      this.outputChannel.appendLine(`Using Rust language server binary: ${rustBinary}`);
+      return {
+        run: {
+          command: rustBinary,
+          args: ["language-server", ...rustExtraArgs, ...pythonArgs],
+          options: { cwd: folder.uri.fsPath },
+          transport:
+            transport !== TransportKind.socket
+              ? transport
+              : { kind: TransportKind.socket, port: (await getPort()) ?? -1 },
+        },
+        debug: {
+          command: rustBinary,
+          args: ["language-server", ...rustExtraArgs, ...pythonArgs],
+          options: { cwd: folder.uri.fsPath },
+          transport:
+            transport !== TransportKind.socket
+              ? transport
+              : { kind: TransportKind.socket, port: (await getPort()) ?? -1 },
+        },
+      };
+    }
+
+    // Fall back to the Python-based launcher.
+    try {
+      if (!(await this.isValidRobotEnvironmentInFolder(folder, true))) return undefined;
+    } catch {
+      return undefined;
+    }
+    const pythonCommand = await this.pythonManager.getPythonCommand(folder);
+    if (!pythonCommand) return undefined;
+
+    const args: string[] = ["-u", "-X", "utf8", this.pythonManager.robotCodeMain];
 
     return {
       run: {

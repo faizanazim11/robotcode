@@ -1,3 +1,4 @@
+import warnings
 from typing import Optional, Sequence, Tuple
 
 import click
@@ -143,6 +144,13 @@ def debug(
     robot_options_and_args: Tuple[str, ...],
 ) -> None:
     """Starts a Robot Framework debug session and waits for incomming connections."""
+    warnings.warn(
+        "The Python-based RobotCode debugger is deprecated and will be removed in a future release. "
+        "Please use the Rust binary (`robotcode debug`) instead. "
+        "See https://github.com/robotcodedev/robotcode/blob/main/docs/migration-rust-binary.md for details.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     from .run import run_debugger
 
     mode, port, bind, pipe_name = resolve_server_options(

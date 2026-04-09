@@ -32,6 +32,20 @@ class RobotCodeHelpers {
         val toolPath: Path = bundledPath.resolve("tool")
         val robotCodePath: Path = toolPath.resolve("robotcode")
         val checkRobotVersion: Path = toolPath.resolve("utils").resolve("check_robot_version.py")
+
+        /**
+         * Path to the bundled Rust `robotcode` binary, or `null` when the binary
+         * has not been included in the plugin distribution yet.
+         *
+         * Layout: `bundled/bin/robotcode` (Linux/macOS) or
+         *         `bundled/bin/robotcode.exe` (Windows).
+         */
+        val rustBinaryPath: Path? by lazy {
+            val binaryName = if (System.getProperty("os.name", "").lowercase().contains("windows"))
+                "robotcode.exe" else "robotcode"
+            val candidate = bundledPath.resolve("bin").resolve(binaryName)
+            if (candidate.exists() && candidate.isRegularFile()) candidate else null
+        }
         
         val PYTHON_AND_ROBOT_OK_KEY = Key.create<CheckPythonAndRobotVersionResult?>("ROBOTCODE_PYTHON_AND_ROBOT_OK")
     }
@@ -121,6 +135,30 @@ fun Project.buildRobotCodeCommandLine(
     noColor: Boolean = true,
     noPager: Boolean = true
 ): GeneralCommandLine {
+    val rustBinary = RobotCodeHelpers.rustBinaryPath
+
+    // When the Rust binary is available, use it directly.
+    // The `args` array already starts with the subcommand name (e.g. "language-server").
+    // `--python` is a subcommand-level flag and must follow the subcommand.
+    // Python-launcher-only global flags (--format, --no-color, --no-pager, -p) are
+    // intentionally not passed — the Rust CLI does not implement them.
+    if (rustBinary != null) {
+        val pythonInterpreter = this.robotPythonSdk?.homePath
+        if (pythonInterpreter == null) {
+            thisLogger().warn(
+                "Rust binary used for project '${this.name}' but no Python SDK is configured. " +
+                "Robot Framework libraries will not be resolved until a Python environment is set."
+            )
+        }
+        val pythonArgs = if (pythonInterpreter != null) arrayOf("--python", pythonInterpreter) else arrayOf()
+        return GeneralCommandLine(
+            rustBinary.pathString,
+            *args,       // ["language-server", "--socket", "6610"] — subcommand first
+            *pythonArgs  // ["--python", "/usr/bin/python3"] — subcommand flag last
+        ).withWorkDirectory(this.basePath).withCharset(Charsets.UTF_8)
+    }
+
+    // Fall back to the Python-based launcher.
     if (this.checkPythonAndRobotVersion() != CheckPythonAndRobotVersionResult.OK) {
         throw InvalidPythonOrRobotVersionException("PythonSDK is not defined or robot version is not valid for project ${this.name}")
     }

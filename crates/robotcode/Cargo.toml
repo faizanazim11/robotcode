@@ -16,6 +16,7 @@ robotcode-language-server = { path = "../robotcode-language-server" }
 robotcode-runner = { path = "../robotcode-runner" }
 robotcode-analyze = { path = "../robotcode-analyze" }
 robotcode-debugger = { path = "../robotcode-debugger" }
+robotcode-repl = { path = "../robotcode-repl" }
 tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true

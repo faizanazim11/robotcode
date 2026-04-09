@@ -1,4 +1,5 @@
 import os
+import warnings
 from pathlib import Path
 from typing import Final, Optional, Sequence, Union
 
@@ -73,6 +74,14 @@ def language_server(
     paths: Sequence[Path],
 ) -> None:
     """Run Robot Framework Language Server."""
+
+    warnings.warn(
+        "The Python-based RobotCode language server is deprecated and will be removed in a future release. "
+        "Please use the Rust binary (`robotcode language-server`) instead. "
+        "See https://github.com/robotcodedev/robotcode/blob/main/docs/migration-rust-binary.md for details.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
 
     profile: Optional[RobotBaseProfile] = None
     analysis_config: Optional[WorkspaceAnalysisConfig] = None
